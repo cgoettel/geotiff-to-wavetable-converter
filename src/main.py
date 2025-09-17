@@ -1,10 +1,9 @@
-#!/usr/bin/python3
-
 import argparse
 import cv2
 import math
 import numpy as np
 import rasterio
+import rasterio.io
 import rasterio.plot
 import sys
 import tempfile
@@ -61,12 +60,14 @@ def convert_geotiff_to_wt(
     # We'll need to resize our array so the wave size (determined by len(array[n])) is a power of 2 in the range 2-4096 and the wave count (determined by len(array)) is between 1-512, inclusive.
     # A little discussion: To illustrate this point, the test input data I'm using (GeoTIFF of Oro Valley, AZ, USA) is 3612x3612. 3612 is between 2048 and 4096 so we have a choice to make: do we resize down and lose data, or do we resize up and maybe incorrectly interpolate data? I've tried both and they're both really accurate. 2048 sounds great in Bitwig. Let's just use the next greatest and be done with it.
     # TODO: add a flag to control the width. lower resolution could produce a crunchier tone. see issue #4.
-    resize_width = calculate_width(dataset.width)
-    resize_height = calculate_height(dataset.height)
+    resize_width: int = calculate_width(dataset.width)
+    resize_height: int = calculate_height(dataset.height)
 
     # With out new width and height determined, we can resize the ndarray to the new size.
     # TODO: add a flag to switch interpolation algorithms. more: https://stackoverflow.com/questions/48121916/numpy-resize-rescale-image
-    resized_array = cv2.resize(array, dsize=(resize_width, resize_height), interpolation=cv2.INTER_CUBIC)
+    resized_array = cv2.resize(
+        array, dsize=(resize_width, resize_height), interpolation=cv2.INTER_CUBIC
+    )
     # If you would like to play around with the dsize dimensions and visualize the output, so that and uncomment this next line:
     # rasterio.plot.show(resized_array)
 
@@ -77,8 +78,8 @@ def convert_geotiff_to_wt(
 
     # Approach 1. This is from [Reddit](https://www.reddit.com/r/synthesizers/comments/84rlal/need_help_with_a_weird_csv_to_audio_conversion/).
     # Set up a temporary file where we can write the WAV data.
-    temp_file = tempfile.NamedTemporaryFile()
-    wave_data = wave.open(temp_file.name, "wb")
+    temp_file: tempfile._TemporaryFileWrapper[bytes] = tempfile.NamedTemporaryFile()
+    wave_data: wave.Wave_write = wave.open(temp_file.name, "wb")
 
     # Define parameters for the wave file.
     channels = 1  # 1 = mono, 2 = stereo
@@ -106,15 +107,15 @@ def convert_geotiff_to_wt(
     # Now that the data is in a format we know how to work with (i.e., WAV), we read the WAV file frame by frame and put those bytes into a list.
     databuffer: list[bytes] = []
     with wave.open(temp_file, "rb") as wav_file:
-        n_frames = wav_file.getnframes()
-        sample_width = wav_file.getsampwidth()
-        content = wav_file.readframes(n_frames * sample_width)
+        n_frames: int = wav_file.getnframes()
+        sample_width: int = wav_file.getsampwidth()
+        content: bytes = wav_file.readframes(n_frames * sample_width)
         databuffer.append(content)
 
     # Approach 2
-    databuffer: list[bytes] = []
-    for current_wave in resized_array:
-        databuffer.append(b"".join(current_wave))
+    # databuffer: list[bytes] = []
+    # for current_wave in resized_array:
+    #     databuffer.append(b"".join(current_wave))
 
     rasterio.plot.show(databuffer)
     return databuffer
@@ -215,7 +216,11 @@ def write_wt_file(output_file: str, samples: list[bytes]):
         if validate_wave_size(wave_size):
             out_file.write(wave_size.to_bytes(4, byteorder="little"))
         else:
-            sys.exit("ERROR: The data has a wave size of {},{}. Must be a power of 2 between 2-4096.".format(wave_size, wave_count))
+            sys.exit(
+                "ERROR: The data has a wave size of {},{}. Must be a power of 2 between 2-4096.".format(
+                    wave_size, wave_count
+                )
+            )
         # The wave count must be between 1-512
         out_file.write(wave_count.to_bytes(2, byteorder="little"))
         # Flags (see https://github.com/surge-synthesizer/surge/blob/main/resources/data/wavetables/WT%20fileformat.txt)
@@ -228,7 +233,7 @@ def write_wt_file(output_file: str, samples: list[bytes]):
             out_file.write(data)
 
 
-def main():
+def main() -> None:
     """
     Parses the command-line arguments and runs the desired commands.
     """
@@ -270,7 +275,7 @@ def main():
     )
 
     # Parse arguments
-    args = parser.parse_args()
+    args: argparse.Namespace = parser.parse_args()
 
     # In order to handle the various options, we first need to read in the raster file and store that object. This also means we don't have to read in the object in multiple places.
     src = rasterio.open(args.input_file, "r")
@@ -290,7 +295,7 @@ def main():
         visualize(src)
         sys.exit(0)
 
-    samples = convert_geotiff_to_wt(src, args.band)
+    samples: list[bytes] = convert_geotiff_to_wt(src, args.band)
     write_wt_file(args.output_file, samples)
 
 

@@ -1,8 +1,10 @@
 # GeoTIFF to wavetable converter
 
-This is an absolutely wild idea I had and I don't know if it's even going to work. I've never worked with GeoTIFF and my wavetable experience is limited. We can totally figure this out. If you'd like to help or if you've noticed some issues, please see the [CONTRIBUTING guide](CONTRIBUTING.md) for information about how to go forward.
+This is a utility to convert GeoTIFF files to wavetable files (`.wt`) for use in synthesizers.
 
-The purpose of this repository is to provide a Python script that can convert geospatial data (currently just GeoTIFF) to a wavetable file (in `.wt` format) so it can be used by a synthesizer.
+Yes, this is an absolutely wild idea and I don't even know if it's going to work. I've never worked with GeoTIFF and my wavetable experience is limited. We can totally figure this out.
+
+If you'd like to help or if you've noticed some issues, please see the [CONTRIBUTING guide](CONTRIBUTING.md) for information about how to go forward.
 
 ## Usage
 

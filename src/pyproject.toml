@@ -9,3 +9,10 @@ dependencies = [
     "opencv-python>=4.11.0.86",
     "rasterio>=1.4.3",
 ]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.3.2",
+    "pre-commit>=3.8.0",
+    "black>=24.4.2",
+]
