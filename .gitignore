@@ -1,2 +1,8 @@
-.vscode
-**/.python-version
+.vscode/
+.DS_Store
+src/.python-version
+
+# Pytest
+__pycache__/
+.pytest_cache/
+src/src.egg-info/
