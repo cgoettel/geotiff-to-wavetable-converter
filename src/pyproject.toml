@@ -1,0 +1,11 @@
+[project]
+name = "src"
+version = "0.1.0"
+description = "Utility to convert GeoTIFF to WAV"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "matplotlib>=3.10.1",
+    "opencv-python>=4.11.0.86",
+    "rasterio>=1.4.3",
+]

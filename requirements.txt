@@ -1,0 +1,6 @@
+# Visualization
+matplotlib
+rasterio
+
+# Resizing image
+opencv-python
