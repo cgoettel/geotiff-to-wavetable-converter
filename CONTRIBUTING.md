@@ -8,15 +8,15 @@ We're doing everything here as native to GitLab as possible. That means that we'
 
 When contributing to this project, please ensure that you write tests for your changes and that all tests are passing before submitting a merge request.
 
-### Running Tests
-
-To run the tests, you first need to install the test dependencies:
+To run the tests or pre-commit hooks, you need to install the test dependencies:
 
 ```bash
 uv pip install -e '.[test]'
 ```
 
-Then, you can run the tests with the following command:
+### Running Tests
+
+You can run the tests with the following command:
 
 ```bash
 uv run pytest
@@ -24,13 +24,7 @@ uv run pytest
 
 ### Running Pre-commit Hooks
 
-This project uses pre-commit to enforce code style and quality. To run the hooks, you first need to install the test dependencies:
-
-```bash
-uv pip install -e '.[test]'
-```
-
-Then, you can run the hooks on all files with the following command:
+This project uses pre-commit to enforce code style and quality. You can run the hooks on all files with the following command:
 
 ```bash
 uv run pre-commit run --all-files
