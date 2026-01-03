@@ -11,12 +11,13 @@ The main documentation is in [`README.md`](README.md). The following information
 - Ensure all new functions have documentation. The documentation should include a description, usage information, parameters (name, type, description), and return value.
 - Python code should be formatted according to the Black Formatter guidelines.
 - Python code should follow type checking strict rules.
+- Markdown headings should only have the first word and proper nouns capitalized.
 
 ## Running tests
 
 - Tests are written in pytest.
 
-## Regarding Dependencies
+## Regarding dependencies
 
 - Avoid introducing new external dependencies unless absolutely necessary.
 - If a new dependency is required, please state the reason.

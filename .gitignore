@@ -1,8 +1,24 @@
 .vscode/
 .DS_Store
+.python-version
 src/.python-version
 
-# Pytest
+# Python
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Pytest
 .pytest_cache/
-src/src.egg-info/
+
+# Examples (potentially copyrighted data)
+examples/
