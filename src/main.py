@@ -1,18 +1,19 @@
 import argparse
-import cv2
 import math
-import numpy as np
-import rasterio
-import rasterio.io
-import rasterio.plot
 import sys
 import tempfile
 import wave
 
+import cv2
+import numpy as np
+import rasterio
+import rasterio.io
+import rasterio.plot
+
 
 def calculate_height(height: int) -> int:
     """
-    wt files require a wave count between 1 and 512, inclusive. Given a height, return the maximum height not greater than 512.
+    wt files require a wave count between 1 and 512, inclusive. Given a height, return the maximum height ≤512.
 
     @param height: the current height
     """
@@ -24,7 +25,9 @@ def calculate_height(height: int) -> int:
 
 def calculate_width(width: int) -> int:
     """
-    wt files require a wave size between 2 and 4096, as a power of 2. Given a width, this method calculates the closest power of 2 without going above 4096.
+    wt files require a wave size between 2 and 4096, as a power of 2.
+
+    Given a width, this method calculates the closest power of 2 without going above 4096.
 
     @param width: the current width
     """
@@ -34,9 +37,7 @@ def calculate_width(width: int) -> int:
         return shift_bit_length(width)
 
 
-def convert_geotiff_to_wt(
-    dataset: rasterio.io.DatasetReader, user_specified_band: int
-) -> list[bytes]:
+def convert_geotiff_to_wt(dataset: rasterio.io.DatasetReader, user_specified_band: int) -> list[bytes]:
     """
     Converts the provided file from GeoTIFF to a wavetable (`.wt` format).
 
@@ -65,9 +66,7 @@ def convert_geotiff_to_wt(
 
     # With out new width and height determined, we can resize the ndarray to the new size.
     # TODO: add a flag to switch interpolation algorithms. more: https://stackoverflow.com/questions/48121916/numpy-resize-rescale-image
-    resized_array = cv2.resize(
-        array, dsize=(resize_width, resize_height), interpolation=cv2.INTER_CUBIC
-    )
+    resized_array = cv2.resize(array, dsize=(resize_width, resize_height), interpolation=cv2.INTER_CUBIC)
     # If you would like to play around with the dsize dimensions and visualize the output, so that and uncomment this next line:
     # rasterio.plot.show(resized_array)
 
@@ -125,7 +124,9 @@ def display_info(dataset: rasterio.io.DatasetReader) -> None:
     """
     Displays information about the provided raster file.
 
-    This object has around 60 pieces of metadata. For more information, open a Python REPL and poke around. I've tried to include only the information that the user will need or might find most helpful or informational. If there is additional information that you think should be provided, please submit a PR or file an issue.
+    This object has around 60 pieces of metadata. For more information, open a Python REPL and poke around.
+    I've tried to include only the information that the user will need or might find most helpful or informational.
+    If there is additional information that you think should be provided, please submit a PR or file an issue.
 
     @param dataset: The DatasetReader object created with rasterio.open()
     """
@@ -136,11 +137,11 @@ def display_info(dataset: rasterio.io.DatasetReader) -> None:
     print(info.format(bands, width, height))
 
 
-def is_band_in_band(
-    dataset: rasterio.io.DatasetReader, user_specified_band: int
-) -> None:
+def is_band_in_band(dataset: rasterio.io.DatasetReader, user_specified_band: int) -> None:
     """
-    Error handling: check the number of bands in the raster file. If the user has specified something outside of that range, print an error message and exit. Otherwise, return None and we continue on.
+    Error handling: check the number of bands in the raster file.
+
+    If the user has specified something outside of that range, print an error message and exit. Otherwise, return None.
 
     @param dataset: The DatasetReader object created with rasterio.open()
     @param user_specified_band: which band the user wanted (from the -b/--band CLI option)
@@ -149,7 +150,8 @@ def is_band_in_band(
     if user_specified_band > number_of_bands:
         # Pluralize "band" if number_of_bands XOR 1 is true.
         sys.exit(
-            f"ERROR: The user-specified band ({user_specified_band}) does not exist. This raster file only contains {number_of_bands} band{'s'[: number_of_bands ^ 1]}."
+            f"ERROR: The user-specified band ({user_specified_band}) does not exist. "
+            f"This raster file only contains {number_of_bands} band{'s'[: number_of_bands ^ 1]}."
         )
 
     return None
@@ -187,7 +189,10 @@ def validate_wave_size(wave_size: int) -> bool:
 
 def visualize(dataset: rasterio.io.DatasetReader) -> None:
     """
-    This is a helpful debugging step that allows you to provide a file and see it plotted. It's a good first step in checking your data — not just that it's valid, but that Python can read it.
+    Plots the provided object.
+
+    This is a helpful debugging step that allows you to provide a file and see it plotted.
+    It's a good first step in checking your data — not just that it's valid, but that Python can read it.
 
     @param dataset: The DatasetReader object created with rasterio.open()
     """
@@ -217,16 +222,14 @@ def write_wt_file(output_file: str, samples: list[bytes]):
             out_file.write(wave_size.to_bytes(4, byteorder="little"))
         else:
             sys.exit(
-                "ERROR: The data has a wave size of {},{}. Must be a power of 2 between 2-4096.".format(
-                    wave_size, wave_count
-                )
+                f"ERROR: The data has a wave size of {wave_size},{wave_count}. Must be a power of 2 between 2-4096."
             )
         # The wave count must be between 1-512
         out_file.write(wave_count.to_bytes(2, byteorder="little"))
         # Flags (see https://github.com/surge-synthesizer/surge/blob/main/resources/data/wavetables/WT%20fileformat.txt)
         # out_file.write(bytes([4, 0]))
         out_file.write(b"0004")
-        # The rest of the byte sequence is the wave data. There's room at the end for metadata, but we're not outputting any metadata.
+        # The rest of the byte sequence is the wave data. There's room at the end for metadata, but we don't have any.
         # float32 format: size = 4 * wave_size * wave_count bytes
         # int16 format:   size = 2 * wave_size * wave_count bytes
         for data in samples:
@@ -254,13 +257,20 @@ def main() -> None:
         "--band",
         default=1,
         type=int,
-        help="Which band you would like processed. The -i/--info option will tell you how many bands there are. You can then use this command in conjunction with -v/--visualize to see that band displayed. Default: 1",
+        help=(
+            "Which band you would like processed. The -i/--info option will tell you how many bands there are. "
+            "You can then use this command in conjunction with -v/--visualize to see that band displayed. Default: 1"
+        ),
     )
     parser.add_argument(
         "-i",
         "--info",
         action="store_true",
-        help="Displays information embedded in the provided raster file. For example, sometimes these files contain multiple bands (e.g., geothermal, elevation) and you want your wavetable to be on a specific band. Use this option before using -b/--band and -v/--visualize to ensure that you're seeing the raster you want.",
+        help=(
+            "Displays information embedded in the provided raster file. "
+            "For example, these files may contain multiple bands (like geothermal, elevation) and you only want one. "
+            "Use this option before using -b/--band and -v/--visualize to ensure you're seeing the raster you want."
+        ),
     )
     parser.add_argument(
         "-o",
@@ -271,13 +281,17 @@ def main() -> None:
         "-v",
         "--visualize",
         action="store_true",
-        help="Pops open a window and displays a visualization of the provided raster. This is a helpful first step to make sure your data is what you think it is. See also -b/--band and -i/--info.",
+        help=(
+            "Displays a visualization of the provided raster in an external viewer."
+            "This is a helpful first step to make check your. See also -b/--band and -i/--info."
+        ),
     )
 
     # Parse arguments
     args: argparse.Namespace = parser.parse_args()
 
-    # In order to handle the various options, we first need to read in the raster file and store that object. This also means we don't have to read in the object in multiple places.
+    # In order to handle the various options, we first need to read in the raster file and store that object.
+    # This also means we don't have to read in the object in multiple places.
     src = rasterio.open(args.input_file, "r")
 
     # Handle each argument. argparse handles -h on its own.
@@ -288,7 +302,9 @@ def main() -> None:
     if args.info:
         display_info(src)
         sys.exit(0)
-    # -o, --output-file. If the user does not specify an output file, save the wavetable to the same path and name as the input file, but with the .wt file extension.
+    # -o, --output-file.
+    # If the user does not specify an output file, save the wavetable to the same path and name as the input file,
+    # but with the .wt file extension.
     if args.output_file is None:
         args.output_file = args.input_file.split(".")[0] + ".wt"
     if args.visualize:
