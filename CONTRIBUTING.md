@@ -22,7 +22,7 @@ Step-by-step instructions:
 1. Verify `uv` is available:
      uv --version
 1. From your project root (the directory that contains `src/`), create a virtual environment directory (example name: `.venv`).
-         uv venv
+     uv venv
 1. Activate the virtual environment:
      - macOS / Linux:
              source .venv/bin/activate
@@ -30,10 +30,8 @@ Step-by-step instructions:
              .\.venv\Scripts\Activate.ps1
      - Windows (cmd.exe):
              .\.venv\Scripts\activate.bat
-1. Install your project in editable mode so imports from `src/` resolve:
-     - This project uses `pyproject.toml`
-     - From the project root:
-             uv sync
+1. Install the project. From the project root, run:
+     uv sync
 1. Deactivate when finished:
      deactivate
 
@@ -48,10 +46,11 @@ Tips and notes:
 
 When contributing to this project, please ensure that you write tests for your changes and that all tests are passing before submitting a merge request.
 
-To run the tests or pre-commit hooks, you need to install the test dependencies:
+To run the tests or pre-commit hooks, you need to install the test dependencies and install pre-commit:
 
 ```bash
 uv pip install -e '.[test]'
+uv run pre-commit install
 ```
 
 ### Running tests
