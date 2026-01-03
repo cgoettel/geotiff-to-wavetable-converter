@@ -1,3 +1,8 @@
+"""Tests for calculate_width function.
+
+Verifies that width is correctly calculated as the next power of 2, capped at 4096.
+"""
+
 from main import calculate_width
 
 

@@ -14,24 +14,32 @@ dependencies = [
 test = [
     "pytest>=8.3.2",
     "pre_commit>=4.5.1",
-    "ruff>=0.1.0",
+    "ruff>=0.14.10",
 ]
 
 [tool.ruff]
 line-length = 120
 target-version = "py313"
 
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
 [tool.ruff.lint]
 select = [
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "D",   # pydocstyle
     "E",   # pycodestyle errors
     "F",   # pyflakes
     "I",   # isort (import sorting)
     "UP",  # pyupgrade
-    "B",   # flake8-bugbear
-    "C4",  # flake8-comprehensions
 ]
-ignore = ["E501"]
+ignore = ["E501"] # TEMPORARY: Ignore line length (handled by 'line-length' setting)
 
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D103"] # Only disable "missing docstring in public function"
+"src/tests/*" = ["D103"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
