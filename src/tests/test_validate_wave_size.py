@@ -1,3 +1,9 @@
+"""Tests for validate_wave_size function.
+
+Verifies wave size validation according to .wt format requirements:
+wave sizes must be powers of 2 between 2 and 4096 inclusive.
+"""
+
 from main import validate_wave_size
 
 

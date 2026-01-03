@@ -1,3 +1,5 @@
+"""Converts raster files (like GeoTIFF) to wavetables (.wt) for use in Bitwig Studio."""
+
 import argparse
 import math
 import sys
@@ -12,10 +14,13 @@ import rasterio.plot
 
 
 def calculate_height(height: int) -> int:
-    """
-    wt files require a wave count between 1 and 512, inclusive. Given a height, return the maximum height ≤512.
+    """The `wt` filetype requires a wave count between 1 and 512, inclusive. Given a height, return the maximum height ≤512.
 
-    @param height: the current height
+    Args:
+        height: the current height
+
+    Returns:
+        the adjusted height, capped at 512
     """
     if height > 512:
         return 512
@@ -24,12 +29,15 @@ def calculate_height(height: int) -> int:
 
 
 def calculate_width(width: int) -> int:
-    """
-    wt files require a wave size between 2 and 4096, as a power of 2.
+    """The `wt` filetype requires a wave size between 2 and 4096, as a power of 2.
 
     Given a width, this method calculates the closest power of 2 without going above 4096.
 
-    @param width: the current width
+    Args:
+        width: the current width
+
+    Returns:
+        the adjusted width, capped at 4096 and as a power of 2
     """
     if width > 4096:
         return 4096
@@ -38,8 +46,7 @@ def calculate_width(width: int) -> int:
 
 
 def convert_geotiff_to_wt(dataset: rasterio.io.DatasetReader, user_specified_band: int) -> list[bytes]:
-    """
-    Converts the provided file from GeoTIFF to a wavetable (`.wt` format).
+    """Converts the provided file from GeoTIFF to a wavetable (`.wt` format).
 
     Notes as I figure this out:
     - Bitwig uses a `.wt` file (or a .wav file, but I think it'll be easier to get to `.wt` (based off of nothing))
@@ -52,8 +59,12 @@ def convert_geotiff_to_wt(dataset: rasterio.io.DatasetReader, user_specified_ban
 
     We're massively overthinking this: the src.read returns an array. THAT'S BASICALLY A CSV! Let's just run with that. We can already convert .csv files.
 
-    @param input_file: a string containing the location of the GeoTIFF file to convert
-    @param user_specified_band: the band of the GeoTIFF file to process. Default: 1
+    Args:
+        dataset: The DatasetReader object created with rasterio.open()
+        user_specified_band: which band the user wanted (from the -b/--band CLI option)
+
+    Returns:
+        A list of bytes representing the frames from the WAV file.
     """
     # Read the data from the specified band and store it.
     array: np.ndarray = dataset.read(user_specified_band)
@@ -121,14 +132,17 @@ def convert_geotiff_to_wt(dataset: rasterio.io.DatasetReader, user_specified_ban
 
 
 def display_info(dataset: rasterio.io.DatasetReader) -> None:
-    """
-    Displays information about the provided raster file.
+    """Displays information about the provided raster file.
 
     This object has around 60 pieces of metadata. For more information, open a Python REPL and poke around.
     I've tried to include only the information that the user will need or might find most helpful or informational.
     If there is additional information that you think should be provided, please submit a PR or file an issue.
 
-    @param dataset: The DatasetReader object created with rasterio.open()
+    Args:
+        dataset: The DatasetReader object created with rasterio.open()
+
+    Returns:
+        None
     """
     bands = dataset.count
     width = dataset.width
@@ -138,13 +152,16 @@ def display_info(dataset: rasterio.io.DatasetReader) -> None:
 
 
 def is_band_in_band(dataset: rasterio.io.DatasetReader, user_specified_band: int) -> None:
-    """
-    Error handling: check the number of bands in the raster file.
+    """Error handling: check the number of bands in the raster file.
 
     If the user has specified something outside of that range, print an error message and exit. Otherwise, return None.
 
-    @param dataset: The DatasetReader object created with rasterio.open()
-    @param user_specified_band: which band the user wanted (from the -b/--band CLI option)
+    Args:
+        dataset: The DatasetReader object created with rasterio.open()
+        user_specified_band: which band the user wanted (from the -b/--band CLI option)
+
+    Returns:
+        None
     """
     number_of_bands = dataset.count
     if user_specified_band > number_of_bands:
@@ -158,8 +175,7 @@ def is_band_in_band(dataset: rasterio.io.DatasetReader, user_specified_band: int
 
 
 def shift_bit_length(num: int) -> int:
-    """
-    Finds the next greatest power of 2 that is greater than or equal to num.
+    """Finds the next greatest power of 2 that is greater than or equal to num.
 
     Usage::
 
@@ -171,15 +187,24 @@ def shift_bit_length(num: int) -> int:
 
     >>> shift_bit_length(2049)
     4096
+
+    Args:
+        num: the number to evaluate
+
+    Returns:
+        the next greatest power of 2 greater than or equal to num
     """
     return 1 << (num - 1).bit_length()
 
 
 def validate_wave_size(wave_size: int) -> bool:
-    """
-    Validates that the given wave size is between 2-4096 and is a power of 2.
+    """Validates that the given wave size is between 2-4096 and is a power of 2.
 
-    @param wave_size: The wave size we are validating
+    Args:
+        wave_size: The wave size we are validating
+
+    Returns:
+        True if the wave size is valid, False otherwise.
     """
     if math.log2(wave_size).is_integer() and wave_size >= 2 and wave_size <= 4096:
         return True
@@ -188,25 +213,33 @@ def validate_wave_size(wave_size: int) -> bool:
 
 
 def visualize(dataset: rasterio.io.DatasetReader) -> None:
-    """
-    Plots the provided object.
+    """Plots the provided object.
 
     This is a helpful debugging step that allows you to provide a file and see it plotted.
     It's a good first step in checking your data — not just that it's valid, but that Python can read it.
 
-    @param dataset: The DatasetReader object created with rasterio.open()
+    Args:
+        dataset: The DatasetReader object created with rasterio.open()
+
+    Returns:
+        None
     """
     # TODO: I think it would look prettier to display a title with the graphic, but src.meta is pretty ugly and probably not what the end user wants to see. For USGS data, they're not putting the location or even coordinates in the object anywhere, so not sure what to display. Display nothing cause that's better?
     # rasterio.plot.show(src, title=src.meta)
     rasterio.plot.show(dataset)
 
 
-def write_wt_file(output_file: str, samples: list[bytes]):
-    """
+def write_wt_file(output_file: str, samples: list[bytes]) -> None:
+    """Writes a `.wt` file to disk.
+
     From: https://github.com/surge-synthesizer/surge/blob/main/scripts/wt-tool/generated-wt.py#L8C1-L15C26
 
-    @param output_file: a string containing the location of the `.wt` file we're going to write
-    @param samples: a list of bytes containing the frames from the WAV file
+    Args:
+        output_file: a string containing the location of the `.wt` file we're going to write
+        samples: a list of bytes containing the frames from the WAV file
+
+    Returns:
+        None
     """
     with open(output_file, "wb") as out_file:
         # Big endian. Everything following is little endian.
@@ -237,14 +270,12 @@ def write_wt_file(output_file: str, samples: list[bytes]):
 
 
 def main() -> None:
-    """
-    Parses the command-line arguments and runs the desired commands.
-    """
+    """Parses the command-line arguments and runs the desired commands."""
     # Instantiate argument parser
     parser = argparse.ArgumentParser(description="Converts rasters to a wavetable.")
 
     # Required arguments
-    # TODO: this works with both relative and absolute paths?
+    # TODO: Does this work with both relative and absolute paths?
     parser.add_argument(
         "input_file",
         type=str,
