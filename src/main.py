@@ -149,7 +149,7 @@ def is_band_in_band(
     if user_specified_band > number_of_bands:
         # Pluralize "band" if number_of_bands XOR 1 is true.
         sys.exit(
-            f"ERROR: The user-specified band ({user_specified_band}) does not exist. This raster file only contains {number_of_bands} band{'s'[:number_of_bands^1]}."
+            f"ERROR: The user-specified band ({user_specified_band}) does not exist. This raster file only contains {number_of_bands} band{'s'[: number_of_bands ^ 1]}."
         )
 
     return None
@@ -187,7 +187,7 @@ def validate_wave_size(wave_size: int) -> bool:
 
 def visualize(dataset: rasterio.io.DatasetReader) -> None:
     """
-    This is a helpful debugging step that allows you to provide a file and see it plotted. It's a good first step in checking your data, not just that it's valid, but that Python can read it.
+    This is a helpful debugging step that allows you to provide a file and see it plotted. It's a good first step in checking your data — not just that it's valid, but that Python can read it.
 
     @param dataset: The DatasetReader object created with rasterio.open()
     """
@@ -289,7 +289,7 @@ def main() -> None:
         display_info(src)
         sys.exit(0)
     # -o, --output-file. If the user does not specify an output file, save the wavetable to the same path and name as the input file, but with the .wt file extension.
-    if args.output_file == None:
+    if args.output_file is None:
         args.output_file = args.input_file.split(".")[0] + ".wt"
     if args.visualize:
         visualize(src)
