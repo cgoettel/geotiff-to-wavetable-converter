@@ -142,9 +142,9 @@ def display_info(dataset: rasterio.io.DatasetReader) -> None:
     Returns:
         None
     """
-    bands = dataset.count
-    width = dataset.width
-    height = dataset.height
+    bands: int = dataset.count
+    width: int = dataset.width
+    height: int = dataset.height
     info = "Bands: {}\nWidth: {}\nHeight: {}"
     print(info.format(bands, width, height))
 
@@ -161,15 +161,13 @@ def is_band_in_band(dataset: rasterio.io.DatasetReader, user_specified_band: int
     Returns:
         None
     """
-    number_of_bands = dataset.count
+    number_of_bands: int = dataset.count
     if user_specified_band > number_of_bands:
         # Pluralize "band" if number_of_bands XOR 1 is true.
         sys.exit(
             f"ERROR: The user-specified band ({user_specified_band}) does not exist. "
             f"This raster file only contains {number_of_bands} band{'s'[: number_of_bands ^ 1]}."
         )
-
-    return None
 
 
 def shift_bit_length(num: int) -> int:
@@ -321,7 +319,7 @@ def main() -> None:
 
     # In order to handle the various options, we first need to read in the raster file and store that object.
     # This also means we don't have to read in the object in multiple places.
-    src = rasterio.open(args.input_file, "r")
+    src: rasterio.io.DatasetReader = rasterio.open(args.input_file, "r")
 
     # Handle each argument. argparse handles -h on its own.
     # -b, --band. If the provided band is out-of-band, print an error message and exit.
