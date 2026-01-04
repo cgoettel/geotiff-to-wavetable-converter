@@ -4,7 +4,7 @@ Verifies wave size validation according to .wt format requirements:
 wave sizes must be powers of 2 between 2 and 4096 inclusive.
 """
 
-from main import validate_wave_size
+from geotiff_to_wavetable import validate_wave_size
 
 
 def test_validate_wave_size_valid() -> None:
