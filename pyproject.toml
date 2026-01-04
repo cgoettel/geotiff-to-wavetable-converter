@@ -18,6 +18,9 @@ test = [
     "ruff>=0.14.10",
 ]
 
+[project.scripts]
+geotiff-to-wavetable = "geotiff_to_wavetable.cli:main"
+
 [tool.mypy]
 python_version = "3.14"
 strict = true
@@ -55,3 +58,6 @@ ignore = ["E501"] # TEMPORARY: Ignore line length (handled by 'line-length' sett
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.setuptools.package-data]
+geotiff_to_wavetable = ["py.typed"]
