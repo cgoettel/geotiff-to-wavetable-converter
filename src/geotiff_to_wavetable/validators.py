@@ -1,9 +1,13 @@
 """Validation utility functions."""
 
+import logging
 import math
 import sys
 
 import rasterio
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
 def is_band_in_band(dataset: rasterio.io.DatasetReader, user_specified_band: int) -> None:

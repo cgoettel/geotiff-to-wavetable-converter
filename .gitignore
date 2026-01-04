@@ -2,6 +2,7 @@
 .DS_Store
 .python-version
 src/.python-version
+*.log
 
 # Python
 __pycache__/
@@ -19,6 +20,3 @@ venv/
 
 # Pytest
 .pytest_cache/
-
-# Examples (potentially copyrighted data)
-examples/

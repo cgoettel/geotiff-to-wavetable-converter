@@ -190,7 +190,7 @@ test = [
 requires-dist = [
     { name = "matplotlib", specifier = ">=3.10.1" },
     { name = "mypy", marker = "extra == 'test'", specifier = ">=1.19.1" },
-    { name = "opencv-python", specifier = ">=4.11.0.86" },
+    { name = "opencv-python", specifier = ">=4.12.0.88" },
     { name = "pre-commit", marker = "extra == 'test'", specifier = ">=4.5.1" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3.2" },
     { name = "rasterio", specifier = ">=1.4.4" },

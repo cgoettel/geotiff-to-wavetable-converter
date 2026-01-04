@@ -1,10 +1,15 @@
 """I/O utility functions."""
 
+import logging
 import sys
 
 import rasterio
+import rasterio.plot
 
 from geotiff_to_wavetable.validators import validate_wave_size
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
 def display_info(dataset: rasterio.io.DatasetReader) -> None:
@@ -44,14 +49,18 @@ def visualize(dataset: rasterio.io.DatasetReader) -> None:
     rasterio.plot.show(dataset)
 
 
-def write_wt_file(output_file: str, samples: list[bytes]) -> None:
+def write_wt_file(output_file: str, samples: list[bytes], wave_size: int, wave_count: int) -> None:
     """Writes a `.wt` file to disk.
 
     From: https://github.com/surge-synthesizer/surge/blob/main/scripts/wt-tool/generated-wt.py#L8C1-L15C26
 
+    `.wt` files are binary and in [this format](https://github.com/surge-synthesizer/surge/blob/main/resources/data/wavetables/WT%20fileformat.txt)
+
     Args:
         output_file: a string containing the location of the `.wt` file we're going to write
         samples: a list of bytes containing the frames from the WAV file
+        wave_size: the size of each wave in the wavetable
+        wave_count: the number of waves in the wavetable
 
     Returns:
         None
@@ -59,11 +68,6 @@ def write_wt_file(output_file: str, samples: list[bytes]) -> None:
     with open(output_file, "wb") as out_file:
         # Big endian. Everything following is little endian.
         out_file.write(b"vawt")
-
-        # wave_size = int(len(samples[0]) / 4)
-        wave_size = 4096
-        # wave_count = len(samples)
-        wave_count = 512
 
         # The wave size must be between 2-4096 (as a power of 2)
         if validate_wave_size(wave_size):
@@ -75,8 +79,7 @@ def write_wt_file(output_file: str, samples: list[bytes]) -> None:
         # The wave count must be between 1-512
         out_file.write(wave_count.to_bytes(2, byteorder="little"))
         # Flags (see https://github.com/surge-synthesizer/surge/blob/main/resources/data/wavetables/WT%20fileformat.txt)
-        # out_file.write(bytes([4, 0]))
-        out_file.write(b"0004")
+        out_file.write(bytes([12, 0]))
         # The rest of the byte sequence is the wave data. There's room at the end for metadata, but we don't have any.
         # float32 format: size = 4 * wave_size * wave_count bytes
         # int16 format:   size = 2 * wave_size * wave_count bytes

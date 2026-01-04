@@ -8,7 +8,67 @@ If you'd like to help or if you've noticed some issues, please see the [CONTRIBU
 
 ## Usage
 
-TODO
+For these examples, we'll use a GeoTIFF of the Oro Valley in Arizona (`examples/USGS_1_n33w111_20240401.tif`). There's also a GeoTIFF of the lower Colorado river in there for you to check out. For more geospatial data, check out [the sources below](#finding-geospatial-data).
+
+The tool automatically:
+
+- Replaces nodata values (like -999999) with the mean elevation
+- Resizes your terrain to valid dimensions (width: power of 2 between 2–4096, height: max 512)
+- Normalizes elevation values to audio range (-32768 to 32767 for int16 format)
+
+### Basic conversion
+
+Convert a GeoTIFF file to a wavetable:
+
+```bash
+geotiff-to-wavetable examples/USGS_1_n33w111_20240401.tif
+```
+
+This creates `examples/USGS_1_n33w111_20240401.wt` (in the same directory as your input file). The tool will automatically handle nodata values (like oceans or missing data) and resize your terrain to valid wavetable dimensions.
+
+### Options
+
+**Usage info:**
+
+```bash
+geotiff-to-wavetable -h
+```
+
+**Specify an output file:**
+
+```bash
+geotiff-to-wavetable examples/USGS_1_n33w111_20240401.tif -o output.wt
+```
+
+**Select a specific band** (if your GeoTIFF has multiple bands):
+
+```bash
+geotiff-to-wavetable examples/USGS_1_n33w111_20240401.tif -b 2
+```
+
+Most elevation data only has one band, so you won't need this option. Use `-i` to see how many bands your file has.
+
+**View file information** (bands, width, height):
+
+```bash
+geotiff-to-wavetable examples/USGS_1_n33w111_20240401.tif -i
+```
+
+**Visualize the data** before converting:
+
+View the default band:
+
+```bash
+geotiff-to-wavetable examples/USGS_1_n33w111_20240401.tif -v
+```
+
+View a specific band:
+
+```bash
+geotiff-to-wavetable examples/USGS_1_n33w111_20240401.tif -b 2 -v
+```
+
+This opens a plot showing your elevation data. It's a helpful first step to make sure Python can read your file and that it contains the terrain you expect. If it doesn't look right, make sure to check how many bands there are (`-i`) and then view the other bands.
 
 ### Importing into Bitwig
 
@@ -26,11 +86,39 @@ Then, in Bitwig:
 - Change your Oscillator to "Wavetable" and click on the wavetable.
 - This will bring up the Wavetables selector. On the left, click "My Library" and you should see your wavetable there.
 
+You can also drag your wavetable file into the wavetable part of the oscillator.
+
 ## Finding geospatial data
 
-I'm not including any GeoTIFF files in this repository because I don't know how their license works with the license I'm using. If you know more about this, please comment on [this issue]()
+Some sources for dense GeoTIFF data:
 
-You can download GeoTIFF data from a number of places. Here are some examples (not to get all Wikipedia on you, but you can help by expanding this):
+1. [USGS Elevation](https://apps.nationalmap.gov/downloader/)
+    - Filter by: GeoTIFF, Elevation Products (DEM)
+    - Choose interesting terrain: mountains, canyons, volcanoes
+    - 1-arc-second resolution is good
+1. [OpenTopography](https://opentopography.org/)
+    - High-resolution LiDAR elevation data
+    - Great for detailed terrain
+    - Requires free account
+1. [SRTM (Shuttle Radar Topography Mission)](https://dwtkns.com/srtm30m/)
+    - Global elevation data, 30m resolution
+    - Has an easy browser
+    - Download tiles covering interesting places
+1. [NASA ASTER GDEM](https://asterweb.jpl.nasa.gov/gdem.asp)
+    - Global elevation
+    - Higher resolution than SRTM
 
-1. [NASA](https://www.earthdata.nasa.gov/data/catalog) (be sure to filter by GeoTIFF)
-1. [USGS](https://apps.nationalmap.gov/downloader/)
+> 💡 **Pro tips**
+>
+> - Avoid: Ocean/water data, cloud/atmospheric data, sparse measurements
+> - Look for: Elevation (DEM), bathymetry, land surface temperature
+> - Interesting terrain: Iceland volcanoes, Grand Canyon, Himalayas, Hawaiian islands
+
+### An example of getting a GeoTIFF from USGS
+
+1. Go to [their site](https://apps.nationalmap.gov/downloader/)
+1. Zoom in on an area or search (upper right of the map). I have found that larger areas work better for finding results and then you can scroll through until you see something interesting.
+1. On the left, you should be in the Datasets tab. Select "Elevation Source Data (3DEP) - Lidar, IfSAR". Within that, you can select File Formats "TIFF" (I want to add LiDAR support in a future update)
+1. You might need to scroll up. Click the "🔍 Search Products" button. This will bring you to the Products tab.
+1. You can now scroll through the available images. If nothing returns, try increasing your area. For example, I couldn't find anything for Kauai. I zoomed out and couldn't find anything for the Hawaiian Islands. So I zoomed out and got stuff for the Aleutian Islands ([copyright is commercial for Alaska](https://www.usgs.gov/faqs/are-usgs-topographic-maps-copyrighted) which is why we're using Arizona for our `examples/`).
+1. Find something that looks interesting and click the "Download Link (TIF)" link (it might be "Download Link (ZIP)" and then you'll need to unzip and might have multiple TIFs to play around with).
