@@ -1,6 +1,7 @@
 """Command-line interface for the GeoTIFF to Wavetable converter."""
 
 import argparse
+import logging
 import sys
 
 import rasterio
@@ -9,16 +10,34 @@ from geotiff_to_wavetable.converter import convert_geotiff_to_wt
 from geotiff_to_wavetable.io_utils import display_info, visualize, write_wt_file
 from geotiff_to_wavetable.validators import is_band_in_band
 
+# Set up logger
+logger = logging.getLogger(__name__)
+
 
 def main() -> None:
     """Parses the command-line arguments and runs the desired commands."""
+    # Set up logging. We want INFO (default; feel free to change) and higher logged to a file, but only WARNING and higher to the console.
+    # File handler for everything
+    file_handler = logging.FileHandler("geotiff_to_wavetable.log")
+    file_handler.setLevel(logging.INFO)
+
+    # Console handler for warnings and errors only
+    console_handler = logging.StreamHandler()  # Defaults to stderr
+    console_handler.setLevel(logging.WARNING)
+    console_handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))  # Simplified format for console
+
+    logging.basicConfig(
+        level=logging.DEBUG,
+        handlers=[file_handler, console_handler],
+        format="%(asctime)s %(name)s - %(levelname)s: %(message)s",
+    )
+
     # Instantiate argument parser
     parser = argparse.ArgumentParser(description="Converts rasters to a wavetable.")
 
     # Required arguments
-    # TODO: Does this work with both relative and absolute paths?
     parser.add_argument(
-        "input_file",
+        "input_file",  # Works with relative and absolute paths.
         type=str,
         help="The filename (relative or absolute) to the raster file.",
     )
@@ -83,8 +102,10 @@ def main() -> None:
         visualize(src)
         sys.exit(0)
 
-    samples: list[bytes] = convert_geotiff_to_wt(src, args.band)
-    write_wt_file(args.output_file, samples)
+    logger.info(f"Converting band {args.band} from {args.input_file} to {args.output_file}...")
+
+    samples, wave_size, wave_count = convert_geotiff_to_wt(src, args.band)
+    write_wt_file(args.output_file, samples, wave_size, wave_count)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,15 @@
 """Core conversion logic."""
 
+import logging
+
+import cv2
+import numpy as np
+import numpy.typing as npt
 import rasterio
+from cv2.typing import Range
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
 def calculate_height(height: int) -> int:
@@ -35,92 +44,89 @@ def calculate_width(width: int) -> int:
         return shift_bit_length(width)
 
 
-def convert_geotiff_to_wt(dataset: rasterio.io.DatasetReader, user_specified_band: int) -> list[bytes]:
-    """Converts the provided file from GeoTIFF to a wavetable (`.wt` format).
+def convert_geotiff_to_wt(dataset: rasterio.io.DatasetReader, user_specified_band: int) -> tuple[list[bytes], int, int]:
+    """Converts the provided file from GeoTIFF to a list[bytes] which is what the `.wt` format expects.
 
-    Notes as I figure this out:
-    - Bitwig uses a `.wt` file (or a .wav file, but I think it'll be easier to get to `.wt` (based off of nothing))
-    - There's a [wt-tool](https://github.com/surge-synthesizer/surge/blob/main/scripts/wt-tool/wt-tool.py) provided by [Surge Synthesizer](https://github.com/surge-synthesizer/surge-synthesizer.github.io/wiki/Creating-Wavetables-For-Surge) which we might need to rely on heavily, at least for inspiration and guidance.
-        - Maybe they have libraries we can lift, too? Not seeing anything in PyPi. Might just have to sideload. And document.
-        - Here's the [section on writing a .wt file](https://github.com/surge-synthesizer/surge/blob/main/scripts/wt-tool/wt-tool.py#L174-L180)
-    - `.wt` files are binary and in [this format](https://github.com/surge-synthesizer/surge/blob/main/resources/data/wavetables/WT%20fileformat.txt)
-
-    I think the simplest thing to do here is to convert GeoTIFF to an intermediate format (even another picture) because there's too much data in GeoTIFF and I don't know how to handle it. Once it's in another format, `okwt` can already convert pictures to wavetables, so we can do similarly.
-
-    We're massively overthinking this: the src.read returns an array. THAT'S BASICALLY A CSV! Let's just run with that. We can already convert .csv files.
+    You can then feed that list of bytes to the `write_wt_file` function to write the actual file to disk as a `.wt` file.
 
     Args:
         dataset: The DatasetReader object created with rasterio.open()
-        user_specified_band: which band the user wanted (from the -b/--band CLI option)
+        user_specified_band: which band the user wanted (from the -b/--band CLI option) (default: 1)
 
     Returns:
         A list of bytes representing the frames from the WAV file.
     """
-    return []  # TODO: implement this function
+    # Read the data from the specified band and store it.
+    bands = dataset.read(user_specified_band)
 
-    # # Read the data from the specified band and store it.
-    # array: np.ndarray = dataset.read(user_specified_band)
-    # # wt files support wave cycles of length 2-4096 (as powers of 2) and we can't guarantee that our input data will have a number of waves that's a power of 2. Additionally, we can only have a wave count of 1-512 waves.
-    # # We'll need to resize our array so the wave size (determined by len(array[n])) is a power of 2 in the range 2-4096 and the wave count (determined by len(array)) is between 1-512, inclusive.
-    # # A little discussion: To illustrate this point, the test input data I'm using (GeoTIFF of Oro Valley, AZ, USA) is 3612x3612. 3612 is between 2048 and 4096 so we have a choice to make: do we resize down and lose data, or do we resize up and maybe incorrectly interpolate data? I've tried both and they're both really accurate. 2048 sounds great in Bitwig. Let's just use the next greatest and be done with it.
-    # # TODO: add a flag to control the width. lower resolution could produce a crunchier tone. see issue #4.
-    # resize_width: int = calculate_width(dataset.width)
-    # resize_height: int = calculate_height(dataset.height)
+    # Handle nodata values by replacing them with the mean of the valid data.
+    # GeoTiffs often have nodata values defined (to deal with clouds or oceans, etc.), and we don't want the nodata values to skew our data.
+    nodata_values = dataset.nodata
+    if nodata_values is not None:
+        # Create mask for valid data (not nodata AND not NaN)
+        valid_mask = (bands != nodata_values) & (~np.isnan(bands))
 
-    # # With out new width and height determined, we can resize the ndarray to the new size.
-    # # TODO: add a flag to switch interpolation algorithms. more: https://stackoverflow.com/questions/48121916/numpy-resize-rescale-image
-    # resized_array = cv2.resize(array, dsize=(resize_width, resize_height), interpolation=cv2.INTER_CUBIC)
-    # # If you would like to play around with the dsize dimensions and visualize the output, so that and uncomment this next line:
-    # # rasterio.plot.show(resized_array)
+        # Calculate percentage BEFORE replacement
+        valid_percentage = (valid_mask.sum() / valid_mask.size) * 100
+        logger.debug(f"Valid pixels: {valid_mask.sum()} out of {valid_mask.size} ({valid_percentage:.1f}%)")
 
-    # # There are two approaches I can think of:
-    # # 1. convert ndarray -> WAV and then WAV -> bytes (for wt)
-    # # 2. skip the intermediary and just iterate through ndarray and convert to bytes
-    # # Both seem to be producing the same (incorrect) output. That's something, but I'm not sure what.
+        if valid_mask.any():
+            bands[~valid_mask] = bands[valid_mask].mean()
+        else:
+            raise ValueError("Error: The selected band contains only nodata/NaN values. Try a different band or file.")
 
-    # # Approach 1. This is from [Reddit](https://www.reddit.com/r/synthesizers/comments/84rlal/need_help_with_a_weird_csv_to_audio_conversion/).
-    # # Set up a temporary file where we can write the WAV data.
-    # temp_file: tempfile._TemporaryFileWrapper[bytes] = tempfile.NamedTemporaryFile()
-    # wave_data: wave.Wave_write = wave.open(temp_file.name, "wb")
+        # Warn about sparse data
+        if valid_percentage < 50:
+            logger.warning(f"Only {valid_percentage:.1f}% valid data. Wavetable may be mostly silent.")
+            logger.error("Less than 50% valid data — output will likely be unusable.")
 
-    # # Define parameters for the wave file.
-    # channels = 1  # 1 = mono, 2 = stereo
-    # sample_width = 2
-    # sample_rate = 44100
-    # number_of_audio_frames = 0
-    # compression_type = "NONE"
-    # compression_name = "not compressed"
-    # wave_data.setparams(
-    #     (
-    #         channels,
-    #         sample_width,
-    #         sample_rate,
-    #         number_of_audio_frames,
-    #         compression_type,
-    #         compression_name,
-    #     )
-    # )
+    logger.debug(f"Nodata value: {nodata_values}")
+    logger.debug(f"Array has NaN: {np.isnan(bands).any()}")
+    logger.debug(f"Array has Inf: {np.isinf(bands).any()}")
+    logger.debug(f"Array min: {bands.min()}, max: {bands.max()}")
+    logger.debug(f"Range: {bands.max() - bands.min()}")
 
-    # # Write each wave in the dataset's array into a temporary WAV file.
-    # for waveform in resized_array:
-    #     wave_data.writeframes(waveform)
-    # wave_data.close()
+    # We can now save the valid data range AFTER nodata_values handling (for clipping after resize) because we only have valid data.
+    valid_min = bands.min()
+    valid_max = bands.max()
 
-    # # Now that the data is in a format we know how to work with (i.e., WAV), we read the WAV file frame by frame and put those bytes into a list.
-    # databuffer: list[bytes] = []
-    # with wave.open(temp_file, "rb") as wav_file:
-    #     n_frames: int = wav_file.getnframes()
-    #     sample_width: int = wav_file.getsampwidth()
-    #     content: bytes = wav_file.readframes(n_frames * sample_width)
-    #     databuffer.append(content)
+    # wt files support wave cycles of length 2-4096 (as powers of 2) and we can't guarantee that our input data will have a number of waves that's a power of 2. Additionally, we can only have a wave count of 1-512 waves.
+    # We'll need to resize our array so the wave size (determined by len(array[n])) is a power of 2 in the range 2-4096 and the wave count (determined by len(array)) is between 1-512, inclusive.
+    # TODO: (issue #4) add a flag to control the width. lower resolution could produce a crunchier tone. see issue #4.
+    resized_width: int = calculate_width(dataset.width)
+    resized_height: int = calculate_height(dataset.height)
 
-    # # Approach 2
-    # # databuffer: list[bytes] = []
-    # # for current_wave in resized_array:
-    # #     databuffer.append(b"".join(current_wave))
+    logger.debug(f"Resized width: {resized_width}, resized height: {resized_height}")
 
-    # rasterio.plot.show(databuffer)
-    # return databuffer
+    # With our new width and height determined, we can resize the ndarray to the new size.
+    # TODO: add a flag to switch interpolation algorithms. more: https://stackoverflow.com/questions/48121916/numpy-resize-rescale-image
+    resized_bands: Range = cv2.resize(bands, dsize=(resized_width, resized_height), interpolation=cv2.INTER_CUBIC)
+    # Clip to prevent interpolation artifacts
+    clipped_bands: npt.NDArray[np.float64] = np.clip(resized_bands, valid_min, valid_max)
+
+    logger.debug(f"After clip - has NaN: {np.isnan(clipped_bands).any()}")
+    logger.debug(f"After clip - has Inf: {np.isinf(clipped_bands).any()}")
+    logger.debug(f"After clip - min: {clipped_bands.min()}, max: {clipped_bands.max()}")
+    # If you would like to play around with the dsize dimensions and visualize the output: uncomment this next line and add `import rasterio.plot` at the top.
+    # rasterio.plot.show(clipped_bands)
+
+    # With the resized and clipped array, we can now normalize it to fit in the int16 range.
+    # We start by normalizing to 0–1.
+    normalized_bands = (clipped_bands - clipped_bands.min()) / (clipped_bands.max() - clipped_bands.min())
+    # Then scale to int16 range (-32,768 to 32,767) — that's a range of 65,535 total values
+    scaled_bands = normalized_bands * 65535 - 32768
+
+    logger.debug(f"After normalize - min: {normalized_bands.min()}, max: {normalized_bands.max()}")
+    logger.debug(f"After scale - min: {scaled_bands.min()}, max: {scaled_bands.max()}")
+
+    # We can now convert to an int16 array.
+    int16_array = scaled_bands.astype(np.int16)
+
+    # Convert that to bytes.
+    byte_array = int16_array.tobytes()
+
+    # And return a tuple containing: the byte array as a list (because the writer expects a list of bytes, one per wave), the resized width, and the resized height.
+    return [byte_array], resized_width, resized_height
 
 
 def shift_bit_length(num: int) -> int:
