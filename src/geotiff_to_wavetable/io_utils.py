@@ -44,8 +44,6 @@ def visualize(dataset: rasterio.io.DatasetReader) -> None:
     Returns:
         None
     """
-    # TODO: I think it would look prettier to display a title with the graphic, but src.meta is pretty ugly and probably not what the end user wants to see. For USGS data, they're not putting the location or even coordinates in the object anywhere, so not sure what to display. Display nothing cause that's better?
-    # rasterio.plot.show(src, title=src.meta)
     rasterio.plot.show(dataset)
 
 

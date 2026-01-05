@@ -6,6 +6,8 @@ We're doing everything here as native to GitLab as possible. That means that we'
 
 ## Development
 
+Most of what you're going to read in this section is covered by the [Makefile](Makefile). You can use that to help ease the process.
+
 ### Local development with uv
 
 I recommend doing your development work in a virtual environment using `uv`.
@@ -18,29 +20,59 @@ Prerequisites:
 Step-by-step instructions:
 
 1. Install the `uv` CLI (one-time):
-     python -m pip install uv
+
+    ```bash
+    python -m pip install uv
+    ```
+
 1. Verify `uv` is available:
-     uv --version
+
+    ```bash
+    uv --version
+    ```
+
 1. From your project root (the directory that contains `src/`), create a virtual environment directory (example name: `.venv`).
-     uv venv
+
+    ```bash
+    uv venv
+    ```
+
 1. Activate the virtual environment:
      - macOS / Linux:
-             source .venv/bin/activate
+
+        ```bash
+        source .venv/bin/activate
+        ```
+
      - Windows (PowerShell):
-             .\.venv\Scripts\Activate.ps1
+
+        ```bash
+        .\.venv\Scripts\Activate.ps1
+        ```
+
      - Windows (cmd.exe):
-             .\.venv\Scripts\activate.bat
+
+        ```bash
+        .\.venv\Scripts\activate.bat
+        ```
+
 1. Install the project. From the project root, run:
-     uv sync
+
+    ```bash
+    uv sync
+    ```
+
 1. Deactivate when finished:
-     deactivate
 
-Tips and notes:
+    ```bash
+    deactivate
+    ```
 
-- Always run the commands from the project root, not src/.
-- Prefer editable install (`pip install -e .`) for development so changes in `src/` are immediately available.
-- For CI or reproducible builds, prefer explicit commands (create env, activate, install dependencies) and pin dependency versions in a lockfile or requirements file.
-"""
+> 💡 **Tips and notes**
+>
+> - Always run the commands from the project root, not src/.
+> - Prefer editable install (`pip install -e .`) for development so changes in `src/` are immediately available.
+> - For CI or reproducible builds, prefer explicit commands (create env, activate, install dependencies) and pin dependency versions in a lockfile or requirements file.
 
 ## Tests and pre-commit hooks
 
@@ -68,3 +100,86 @@ This project uses pre-commit to enforce code style and quality. You can run the 
 ```bash
 uv run pre-commit run --all-files
 ```
+
+## Building and uploading to PyPi
+
+### Building the package
+
+To build the package, you'll need the build tool installed
+
+```bash
+uv pip install build
+```
+
+Then build your package:
+
+```bash
+python -m build
+```
+
+This creates two files in a new dist/ directory:
+
+- A .tar.gz source distribution
+- A .whl wheel file
+
+### Testing the package locally
+
+Create a test environment and install from your built package:
+
+```bash
+cd /tmp
+uv venv test-geotiff-env
+source test-geotiff-env/bin/activate
+```
+
+Then, install your package from the wheel file
+
+```bash
+uv pip install ~/git/geotiff-to-wavetable-converter/dist/geotiff_to_wavetable-0.1.0-py3-none-any.whl
+```
+
+We can now test that the CLI functions properly:
+
+```bash
+geotiff-to-wavetable --help
+```
+
+The first run will be slow. This is expected.
+
+If --help shows the usage information, the package is working! You can test further functionality or call it quits, deactivate, and clean up:
+
+```bash
+deactivate
+rm -rf test-geotiff-env
+```
+
+### Uploading to PyPI
+
+1. Install `twine` (the upload tool):
+
+    ```bash
+    uv pip install twine
+    ```
+
+1. Create a PyPI account (if you don't have one):
+
+    - Go to <https://pypi.org/account/register/>
+    - Create account and verify your email
+
+1. Create an API token:
+
+    - Go to <https://pypi.org/manage/account/>
+    - Scroll to "API tokens"
+    - Click "Add API token"
+    - Name: geotiff-to-wavetable
+    - Scope: "Entire account" (for first upload)
+    - Copy the token
+
+1. Upload your package:
+
+    ```bash
+    cd ~/git/geotiff-to-wavetable-converter
+    twine upload dist/*
+    ```
+
+    It will prompt for your API token.
