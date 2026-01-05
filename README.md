@@ -2,7 +2,7 @@
 
 This is a utility to convert GeoTIFF files to wavetable files (`.wt`) for use in synthesizers.
 
-Yes, this is an absolutely wild idea and I don't even know if it's going to work. I've never worked with GeoTIFF and my wavetable experience is limited. We can totally figure this out.
+I've never worked with GeoTIFF and my wavetable experience is limited. Huge shout-out to both [`okwt`](https://github.com/drzhnn/okwt/tree/main) and [`surge`](https://github.com/surge-synthesizer/surge/tree/main) for their helpful implementations.
 
 If you'd like to help or if you've noticed some issues, please see the [CONTRIBUTING guide](CONTRIBUTING.md) for information about how to go forward.
 
@@ -90,7 +90,7 @@ You can also drag your wavetable file into the wavetable part of the oscillator.
 
 ## Finding geospatial data
 
-Some sources for dense GeoTIFF data:
+Here are some sources for dense GeoTIFF data:
 
 1. [USGS Elevation](https://apps.nationalmap.gov/downloader/)
     - Filter by: GeoTIFF, Elevation Products (DEM)

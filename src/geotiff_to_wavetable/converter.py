@@ -13,7 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_height(height: int) -> int:
-    """The `wt` filetype requires a wave count between 1 and 512, inclusive. Given a height, return the maximum height ≤512.
+    """Given a height, return the maximum height ≤512.
+
+    The `wt` filetype requires a wave count between 1 and 512, inclusive.
 
     Args:
         height: the current height
@@ -47,7 +49,7 @@ def calculate_width(width: int) -> int:
 def convert_geotiff_to_wt(dataset: rasterio.io.DatasetReader, user_specified_band: int) -> tuple[list[bytes], int, int]:
     """Converts the provided file from GeoTIFF to a list[bytes] which is what the `.wt` format expects.
 
-    You can then feed that list of bytes to the `write_wt_file` function to write the actual file to disk as a `.wt` file.
+    You can then feed that list of bytes to the `write_wt_file` function to write the `.wt` file to disk.
 
     Args:
         dataset: The DatasetReader object created with rasterio.open()
@@ -60,7 +62,7 @@ def convert_geotiff_to_wt(dataset: rasterio.io.DatasetReader, user_specified_ban
     bands = dataset.read(user_specified_band)
 
     # Handle nodata values by replacing them with the mean of the valid data.
-    # GeoTiffs often have nodata values defined (to deal with clouds or oceans, etc.), and we don't want the nodata values to skew our data.
+    # GeoTiffs often have nodata values defined (to deal with clouds or oceans, etc.) which will skew the data.
     nodata_values = dataset.nodata
     if nodata_values is not None:
         # Create mask for valid data (not nodata AND not NaN)
@@ -86,12 +88,13 @@ def convert_geotiff_to_wt(dataset: rasterio.io.DatasetReader, user_specified_ban
     logger.debug(f"Array min: {bands.min()}, max: {bands.max()}")
     logger.debug(f"Range: {bands.max() - bands.min()}")
 
-    # We can now save the valid data range AFTER nodata_values handling (for clipping after resize) because we only have valid data.
+    # Save the valid data range AFTER nodata_values handling (for clipping after resize) with only have valid data.
     valid_min = bands.min()
     valid_max = bands.max()
 
-    # wt files support wave cycles of length 2-4096 (as powers of 2) and we can't guarantee that our input data will have a number of waves that's a power of 2. Additionally, we can only have a wave count of 1-512 waves.
-    # We'll need to resize our array so the wave size (determined by len(array[n])) is a power of 2 in the range 2-4096 and the wave count (determined by len(array)) is between 1-512, inclusive.
+    # wt files support wave cycles of length 2-4096 (as powers of 2).
+    # And wave counts of 1-512 waves.
+    # This resizes the width and height accordingly.
     # TODO: (issue #4) add a flag to control the width. lower resolution could produce a crunchier tone. see issue #4.
     resized_width: int = calculate_width(dataset.width)
     resized_height: int = calculate_height(dataset.height)
@@ -107,7 +110,8 @@ def convert_geotiff_to_wt(dataset: rasterio.io.DatasetReader, user_specified_ban
     logger.debug(f"After clip - has NaN: {np.isnan(clipped_bands).any()}")
     logger.debug(f"After clip - has Inf: {np.isinf(clipped_bands).any()}")
     logger.debug(f"After clip - min: {clipped_bands.min()}, max: {clipped_bands.max()}")
-    # If you would like to play around with the dsize dimensions and visualize the output: uncomment this next line and add `import rasterio.plot` at the top.
+    # If you would like to play around with the dsize dimensions and visualize the output:
+    # Uncomment this next line and add `import rasterio.plot` at the top.
     # rasterio.plot.show(clipped_bands)
 
     # With the resized and clipped array, we can now normalize it to fit in the int16 range.
@@ -125,7 +129,6 @@ def convert_geotiff_to_wt(dataset: rasterio.io.DatasetReader, user_specified_ban
     # Convert that to bytes.
     byte_array = int16_array.tobytes()
 
-    # And return a tuple containing: the byte array as a list (because the writer expects a list of bytes, one per wave), the resized width, and the resized height.
     return [byte_array], resized_width, resized_height
 
 

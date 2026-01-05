@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 def main() -> None:
     """Parses the command-line arguments and runs the desired commands."""
-    # Set up logging. We want INFO (default; feel free to change) and higher logged to a file, but only WARNING and higher to the console.
+    # Set up logging.
+    #  We want INFO+ (default; feel free to change) logged to a file, but only WARNING+ to the console.
     # File handler for everything
     file_handler = logging.FileHandler("geotiff_to_wavetable.log")
     file_handler.setLevel(logging.INFO)
