@@ -1,6 +1,6 @@
 [project]
 name = "geotiff-to-wavetable"
-version = "0.1.1"
+version = "0.2.0"
 description = "Convert GeoTIFF elevation data to wavetable files for synthesizers"
 readme = "README.md"
 requires-python = ">=3.10"

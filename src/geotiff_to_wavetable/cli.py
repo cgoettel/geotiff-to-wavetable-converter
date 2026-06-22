@@ -6,8 +6,9 @@ import sys
 
 import rasterio
 
-from geotiff_to_wavetable.converter import convert_geotiff_to_wt
+from geotiff_to_wavetable.converter import array_to_wavetable
 from geotiff_to_wavetable.io_utils import display_info, visualize, write_wt_file
+from geotiff_to_wavetable.loaders import load_from_geotiff
 from geotiff_to_wavetable.validators import is_band_in_band
 
 # Set up logger
@@ -105,7 +106,8 @@ def main() -> None:
 
     logger.info(f"Converting band {args.band} from {args.input_file} to {args.output_file}...")
 
-    samples, wave_size, wave_count = convert_geotiff_to_wt(src, args.band)
+    array = load_from_geotiff(src, args.band)
+    samples, wave_size, wave_count = array_to_wavetable(array, nodata=src.nodata)
     write_wt_file(args.output_file, samples, wave_size, wave_count)
 
 
