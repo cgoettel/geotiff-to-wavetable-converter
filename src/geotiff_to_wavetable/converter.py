@@ -1,14 +1,16 @@
-"""Core conversion logic."""
+"""Core conversion logic.
+
+Transforms a raw 2D array (from any loader in `loaders`) into the
+list-of-bytes / wave-size / wave-count tuple expected by `write_wt_file`.
+"""
 
 import logging
+from typing import cast
 
 import cv2
 import numpy as np
 import numpy.typing as npt
-import rasterio
-from cv2.typing import Range
 
-# Set up logger
 logger = logging.getLogger(__name__)
 
 
@@ -46,92 +48,6 @@ def calculate_width(width: int) -> int:
         return shift_bit_length(width)
 
 
-def convert_geotiff_to_wt(dataset: rasterio.io.DatasetReader, user_specified_band: int) -> tuple[list[bytes], int, int]:
-    """Converts the provided file from GeoTIFF to a list[bytes] which is what the `.wt` format expects.
-
-    You can then feed that list of bytes to the `write_wt_file` function to write the `.wt` file to disk.
-
-    Args:
-        dataset: The DatasetReader object created with rasterio.open()
-        user_specified_band: which band the user wanted (from the -b/--band CLI option) (default: 1)
-
-    Returns:
-        A list of bytes representing the frames from the WAV file.
-    """
-    # Read the data from the specified band and store it.
-    bands = dataset.read(user_specified_band)
-
-    # Handle nodata values by replacing them with the mean of the valid data.
-    # GeoTiffs often have nodata values defined (to deal with clouds or oceans, etc.) which will skew the data.
-    nodata_values = dataset.nodata
-    if nodata_values is not None:
-        # Create mask for valid data (not nodata AND not NaN)
-        valid_mask = (bands != nodata_values) & (~np.isnan(bands))
-
-        # Calculate percentage BEFORE replacement
-        valid_percentage = (valid_mask.sum() / valid_mask.size) * 100
-        logger.debug(f"Valid pixels: {valid_mask.sum()} out of {valid_mask.size} ({valid_percentage:.1f}%)")
-
-        if valid_mask.any():
-            bands[~valid_mask] = bands[valid_mask].mean()
-        else:
-            raise ValueError("Error: The selected band contains only nodata/NaN values. Try a different band or file.")
-
-        # Warn about sparse data
-        if valid_percentage < 50:
-            logger.warning(f"Only {valid_percentage:.1f}% valid data. Wavetable may be mostly silent.")
-            logger.error("Less than 50% valid data — output will likely be unusable.")
-
-    logger.debug(f"Nodata value: {nodata_values}")
-    logger.debug(f"Array has NaN: {np.isnan(bands).any()}")
-    logger.debug(f"Array has Inf: {np.isinf(bands).any()}")
-    logger.debug(f"Array min: {bands.min()}, max: {bands.max()}")
-    logger.debug(f"Range: {bands.max() - bands.min()}")
-
-    # Save the valid data range AFTER nodata_values handling (for clipping after resize) with only have valid data.
-    valid_min = bands.min()
-    valid_max = bands.max()
-
-    # wt files support wave cycles of length 2-4096 (as powers of 2).
-    # And wave counts of 1-512 waves.
-    # This resizes the width and height accordingly.
-    # TODO: (issue #4) add a flag to control the width. lower resolution could produce a crunchier tone. see issue #4.
-    resized_width: int = calculate_width(dataset.width)
-    resized_height: int = calculate_height(dataset.height)
-
-    logger.debug(f"Resized width: {resized_width}, resized height: {resized_height}")
-
-    # With our new width and height determined, we can resize the ndarray to the new size.
-    # TODO: add a flag to switch interpolation algorithms. more: https://stackoverflow.com/questions/48121916/numpy-resize-rescale-image
-    resized_bands: Range = cv2.resize(bands, dsize=(resized_width, resized_height), interpolation=cv2.INTER_CUBIC)
-    # Clip to prevent interpolation artifacts
-    clipped_bands: npt.NDArray[np.float64] = np.clip(resized_bands, valid_min, valid_max)
-
-    logger.debug(f"After clip - has NaN: {np.isnan(clipped_bands).any()}")
-    logger.debug(f"After clip - has Inf: {np.isinf(clipped_bands).any()}")
-    logger.debug(f"After clip - min: {clipped_bands.min()}, max: {clipped_bands.max()}")
-    # If you would like to play around with the dsize dimensions and visualize the output:
-    # Uncomment this next line and add `import rasterio.plot` at the top.
-    # rasterio.plot.show(clipped_bands)
-
-    # With the resized and clipped array, we can now normalize it to fit in the int16 range.
-    # We start by normalizing to 0–1.
-    normalized_bands = (clipped_bands - clipped_bands.min()) / (clipped_bands.max() - clipped_bands.min())
-    # Then scale to int16 range (-32,768 to 32,767) — that's a range of 65,535 total values
-    scaled_bands = normalized_bands * 65535 - 32768
-
-    logger.debug(f"After normalize - min: {normalized_bands.min()}, max: {normalized_bands.max()}")
-    logger.debug(f"After scale - min: {scaled_bands.min()}, max: {scaled_bands.max()}")
-
-    # We can now convert to an int16 array.
-    int16_array = scaled_bands.astype(np.int16)
-
-    # Convert that to bytes.
-    byte_array = int16_array.tobytes()
-
-    return [byte_array], resized_width, resized_height
-
-
 def shift_bit_length(num: int) -> int:
     """Finds the next greatest power of 2 that is greater than or equal to num.
 
@@ -153,3 +69,146 @@ def shift_bit_length(num: int) -> int:
         the next greatest power of 2 greater than or equal to num
     """
     return 1 << (num - 1).bit_length()
+
+
+def _clean_nodata(
+    bands: npt.NDArray[np.float64],
+    nodata_value: float | None,
+) -> tuple[npt.NDArray[np.float64], float]:
+    """Replace nodata/NaN values in-place with the mean of valid data.
+
+    GeoTIFFs often have a nodata sentinel (for clouds, oceans, gaps, etc.).
+    Leaving those values in skews the normalization step and produces
+    DC-offset artifacts in the wavetable.
+
+    Args:
+        bands: The input 2D array. Modified in place.
+        nodata_value: The dataset's nodata sentinel, or None if unset.
+
+    Returns:
+        A tuple of (cleaned array, percentage of pixels that were valid).
+
+    Raises:
+        ValueError: if the band contains only nodata/NaN values.
+    """
+    if nodata_value is None:
+        logger.debug("No nodata value on the source; skipping nodata cleaning.")
+        return bands, 100.0
+
+    valid_mask = (bands != nodata_value) & (~np.isnan(bands))
+    valid_percentage = (valid_mask.sum() / valid_mask.size) * 100
+    logger.debug(
+        f"Valid pixels: {valid_mask.sum()} of {valid_mask.size} ({valid_percentage:.1f}%); nodata={nodata_value}"
+    )
+
+    if not valid_mask.any():
+        logger.error("Selected band contains only nodata/NaN values — cannot proceed.")
+        raise ValueError("The selected band contains only nodata/NaN values. Try a different band or file.")
+
+    bands[~valid_mask] = bands[valid_mask].mean()
+
+    if valid_percentage < 10:
+        logger.error(f"Only {valid_percentage:.1f}% valid data — output will likely be unusable.")
+    elif valid_percentage < 50:
+        logger.warning(f"Only {valid_percentage:.1f}% valid data. Wavetable may be mostly silent.")
+
+    return bands, valid_percentage
+
+
+def _resize_for_wavetable(
+    bands: npt.NDArray[np.float64],
+    target_width: int,
+    target_height: int,
+    valid_min: float,
+    valid_max: float,
+) -> npt.NDArray[np.float64]:
+    """Resize to wavetable dimensions and clip to the pre-resize valid range.
+
+    Cubic interpolation can overshoot the original range near steep edges, so
+    we clip back to [valid_min, valid_max] to keep the int16 normalization honest.
+
+    Args:
+        bands: The input 2D array (cleaned of nodata).
+        target_width: The output width (wave size — a power of 2 in [2, 4096]).
+        target_height: The output height (wave count — in [1, 512]).
+        valid_min: Lower clip bound, typically `bands.min()` before resize.
+        valid_max: Upper clip bound, typically `bands.max()` before resize.
+
+    Returns:
+        A 2D array of shape (target_height, target_width), clipped to the valid range.
+    """
+    logger.debug(f"Resizing {bands.shape} -> ({target_height}, {target_width}); clip range=[{valid_min}, {valid_max}]")
+    # TODO: (issue #4) add a flag to switch interpolation algorithms.
+    # https://stackoverflow.com/questions/48121916/numpy-resize-rescale-image
+    # cv2.resize preserves dtype at runtime, but its stubs widen it to integer|floating.
+    # Cast is safe because `bands` is guaranteed float64 by the signature above.
+    resized = cast(
+        "npt.NDArray[np.float64]",
+        cv2.resize(bands, dsize=(target_width, target_height), interpolation=cv2.INTER_CUBIC),
+    )
+    clipped: npt.NDArray[np.float64] = np.clip(resized, valid_min, valid_max)
+    logger.debug(
+        f"After resize+clip: has_nan={np.isnan(clipped).any()}, has_inf={np.isinf(clipped).any()}, "
+        f"min={clipped.min()}, max={clipped.max()}"
+    )
+    return clipped
+
+
+def _normalize_to_int16(bands: npt.NDArray[np.float64]) -> npt.NDArray[np.int16]:
+    """Linearly rescale an array into the int16 audio range (-32768, 32767).
+
+    Args:
+        bands: The input 2D array. Must have `max > min` (i.e. non-constant data).
+
+    Returns:
+        A 2D int16 array spanning the full int16 range.
+    """
+    normalized = (bands - bands.min()) / (bands.max() - bands.min())
+    scaled = normalized * 65535 - 32768
+    result: npt.NDArray[np.int16] = scaled.astype(np.int16)
+    logger.debug(
+        f"Normalized 0-1 range: [{normalized.min():.4f}, {normalized.max():.4f}]; "
+        f"scaled int16 range: [{result.min()}, {result.max()}]"
+    )
+    return result
+
+
+def array_to_wavetable(
+    array: npt.NDArray[np.float64],
+    nodata: float | None = None,
+) -> tuple[list[bytes], int, int]:
+    """Convert a raw 2D array into wavetable byte data.
+
+    This is the source-agnostic entry point. Pair it with a loader from the
+    `loaders` module (e.g. `load_from_geotiff`) to go end-to-end.
+
+    Args:
+        array: A 2D array of raw sample data (e.g. elevation values).
+        nodata: The sentinel value representing "no data", or None if the
+            array has no nodata values.
+
+    Returns:
+        A tuple of (byte frames list, wave size / width, wave count / height)
+        suitable for passing to `write_wt_file`.
+    """
+    height, width = array.shape
+    logger.info(f"Converting {height}x{width} array to wavetable (nodata={nodata}).")
+
+    cleaned, valid_percentage = _clean_nodata(array, nodata)
+
+    # Capture the valid range AFTER cleaning (so nodata-replacement values are
+    # included) but BEFORE resize (so cubic interpolation overshoot gets clipped
+    # back to the real data range).
+    valid_min = cleaned.min()
+    valid_max = cleaned.max()
+
+    wave_size = calculate_width(width)
+    wave_count = calculate_height(height)
+
+    resized = _resize_for_wavetable(cleaned, wave_size, wave_count, valid_min, valid_max)
+    int16_array = _normalize_to_int16(resized)
+
+    logger.info(
+        f"Produced wavetable: wave_size={wave_size}, wave_count={wave_count}, valid_data={valid_percentage:.1f}%."
+    )
+    return [int16_array.tobytes()], wave_size, wave_count
