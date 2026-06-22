@@ -93,20 +93,20 @@ You can also drag your wavetable file into the wavetable part of the oscillator.
 Here are some sources for dense GeoTIFF data:
 
 1. [USGS Elevation](https://apps.nationalmap.gov/downloader/)
-    - Filter by: GeoTIFF, Elevation Products (DEM)
-    - Choose interesting terrain: mountains, canyons, volcanoes
-    - 1-arc-second resolution is good
-1. [OpenTopography](https://opentopography.org/)
-    - High-resolution LiDAR elevation data
-    - Great for detailed terrain
-    - Requires free account
-1. [SRTM (Shuttle Radar Topography Mission)](https://dwtkns.com/srtm30m/)
-    - Global elevation data, 30m resolution
-    - Has an easy browser
-    - Download tiles covering interesting places
-1. [NASA ASTER GDEM](https://asterweb.jpl.nasa.gov/gdem.asp)
-    - Global elevation
-    - Higher resolution than SRTM
+   - Filter by: GeoTIFF, Elevation Products (DEM)
+   - Choose interesting terrain: mountains, canyons, volcanoes
+   - 1-arc-second resolution is good
+2. [OpenTopography](https://opentopography.org/)
+   - High-resolution LiDAR elevation data
+   - Great for detailed terrain
+   - Requires free account
+3. [SRTM (Shuttle Radar Topography Mission)](https://dwtkns.com/srtm30m/)
+   - Global elevation data, 30m resolution
+   - Has an easy browser
+   - Download tiles covering interesting places
+4. [NASA ASTER GDEM](https://asterweb.jpl.nasa.gov/gdem.asp)
+   - Global elevation
+   - Higher resolution than SRTM
 
 > 💡 **Pro tips**
 >
@@ -117,8 +117,8 @@ Here are some sources for dense GeoTIFF data:
 ### An example of getting a GeoTIFF from USGS
 
 1. Go to [their site](https://apps.nationalmap.gov/downloader/)
-1. Zoom in on an area or search (upper right of the map). I have found that larger areas work better for finding results and then you can scroll through until you see something interesting.
-1. On the left, you should be in the Datasets tab. Select "Elevation Source Data (3DEP) - Lidar, IfSAR". Within that, you can select File Formats "TIFF" (I want to add LiDAR support in a future update)
-1. You might need to scroll up. Click the "🔍 Search Products" button. This will bring you to the Products tab.
-1. You can now scroll through the available images. If nothing returns, try increasing your area. For example, I couldn't find anything for Kauai. I zoomed out and couldn't find anything for the Hawaiian Islands. So I zoomed out and got stuff for the Aleutian Islands ([copyright is commercial for Alaska](https://www.usgs.gov/faqs/are-usgs-topographic-maps-copyrighted) which is why we're using Arizona for our `examples/`).
-1. Find something that looks interesting and click the "Download Link (TIF)" link (it might be "Download Link (ZIP)" and then you'll need to unzip and might have multiple TIFs to play around with).
+2. Zoom in on an area or search (upper right of the map). I have found that larger areas work better for finding results and then you can scroll through until you see something interesting.
+3. On the left, you should be in the Datasets tab. Select "Elevation Source Data (3DEP) - Lidar, IfSAR". Within that, you can select File Formats "TIFF" (I want to add LiDAR support in a future update)
+4. You might need to scroll up. Click the "🔍 Search Products" button. This will bring you to the Products tab.
+5. You can now scroll through the available images. If nothing returns, try increasing your area. For example, I couldn't find anything for Kauai. I zoomed out and couldn't find anything for the Hawaiian Islands. So I zoomed out and got stuff for the Aleutian Islands ([copyright is commercial for Alaska](https://www.usgs.gov/faqs/are-usgs-topographic-maps-copyrighted) which is why we're using Arizona for our `examples/`).
+6. Find something that looks interesting and click the "Download Link (TIF)" link (it might be "Download Link (ZIP)" and then you'll need to unzip and might have multiple TIFs to play around with).
