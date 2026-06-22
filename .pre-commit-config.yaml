@@ -1,11 +1,9 @@
+# File hygiene (trailing-whitespace, end-of-file-fixer, check-added-large-files,
+# mixed-line-ending, check-merge-conflict), markdown formatting, secret scanning,
+# and conventional commit-msg linting now live in the fleet-wide global pre-commit
+# hygiene tier (~/.config/pre-commit/global.yaml, run via core.hooksPath). This
+# config keeps only the language-specific toolchain, which CI also mirrors.
 repos:
-    - repo: https://github.com/pre-commit/pre-commit-hooks
-      rev: v6.0.0
-      hooks:
-          - id: check-added-large-files
-            args: ['--maxkb=502']
-          - id: end-of-file-fixer
-          - id: trailing-whitespace
     - repo: https://github.com/pre-commit/mirrors-mypy
       rev: v1.19.1
       hooks:

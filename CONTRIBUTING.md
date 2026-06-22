@@ -21,52 +21,53 @@ Step-by-step instructions:
 
 1. Install the `uv` CLI (one-time):
 
-    ```bash
-    python -m pip install uv
-    ```
+   ```bash
+   python -m pip install uv
+   ```
 
-1. Verify `uv` is available:
+2. Verify `uv` is available:
 
-    ```bash
-    uv --version
-    ```
+   ```bash
+   uv --version
+   ```
 
-1. From your project root (the directory that contains `src/`), create a virtual environment directory (example name: `.venv`).
+3. From your project root (the directory that contains `src/`), create a virtual environment directory (example name: `.venv`).
 
-    ```bash
-    uv venv
-    ```
+   ```bash
+   uv venv
+   ```
 
-1. Activate the virtual environment:
-     - macOS / Linux:
+4. Activate the virtual environment:
 
-        ```bash
-        source .venv/bin/activate
-        ```
+   - macOS / Linux:
 
-     - Windows (PowerShell):
+     ```bash
+     source .venv/bin/activate
+     ```
 
-        ```bash
-        .\.venv\Scripts\Activate.ps1
-        ```
+   - Windows (PowerShell):
 
-     - Windows (cmd.exe):
+     ```bash
+     .\.venv\Scripts\Activate.ps1
+     ```
 
-        ```bash
-        .\.venv\Scripts\activate.bat
-        ```
+   - Windows (cmd.exe):
 
-1. Install the project. From the project root, run:
+     ```bash
+     .\.venv\Scripts\activate.bat
+     ```
 
-    ```bash
-    uv sync
-    ```
+5. Install the project. From the project root, run:
 
-1. Deactivate when finished:
+   ```bash
+   uv sync
+   ```
 
-    ```bash
-    deactivate
-    ```
+6. Deactivate when finished:
+
+   ```bash
+   deactivate
+   ```
 
 > 💡 **Tips and notes**
 >
@@ -157,29 +158,29 @@ rm -rf test-geotiff-env
 
 1. Install `twine` (the upload tool):
 
-    ```bash
-    uv pip install twine
-    ```
+   ```bash
+   uv pip install twine
+   ```
 
-1. Create a PyPI account (if you don't have one):
+2. Create a PyPI account (if you don't have one):
 
-    - Go to <https://pypi.org/account/register/>
-    - Create account and verify your email
+   - Go to <https://pypi.org/account/register/>
+   - Create account and verify your email
 
-1. Create an API token:
+3. Create an API token:
 
-    - Go to <https://pypi.org/manage/account/>
-    - Scroll to "API tokens"
-    - Click "Add API token"
-    - Name: geotiff-to-wavetable
-    - Scope: "Entire account" (for first upload)
-    - Copy the token
+   - Go to <https://pypi.org/manage/account/>
+   - Scroll to "API tokens"
+   - Click "Add API token"
+   - Name: geotiff-to-wavetable
+   - Scope: "Entire account" (for first upload)
+   - Copy the token
 
-1. Upload your package:
+4. Upload your package:
 
-    ```bash
-    cd ~/git/geotiff-to-wavetable-converter
-    twine upload dist/*
-    ```
+   ```bash
+   cd ~/git/geotiff-to-wavetable-converter
+   twine upload dist/*
+   ```
 
-    It will prompt for your API token.
+   It will prompt for your API token.
