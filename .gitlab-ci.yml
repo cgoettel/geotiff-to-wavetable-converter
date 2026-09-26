@@ -1,6 +1,11 @@
-# Mirror main to github.com/cgoettel/geotiff-to-wavetable-converter on every push to main.
+# mirror_to_github: mirror main to github.com/cgoettel/geotiff-to-wavetable-converter on every push to main.
 # GITHUB_DEPLOY_KEY is a File-type CI variable holding the SSH private key
 # whose public half is a write-enabled deploy key on the GitHub repo.
+#
+# publish_to_pypi: pushing a version tag (v0.2.0) tests, builds, and uploads that version to PyPI.
+# No stored secret: PyPI trusts this project's GitLab CI via a trusted publisher
+# (pypi.org → geotiff-to-wavetable → Settings → Publishing), so the job trades
+# GitLab's short-lived identity token for a short-lived PyPI upload token.
 
 mirror_to_github:
   image:
@@ -20,3 +25,35 @@ mirror_to_github:
     - git push --force github HEAD:refs/heads/main
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+
+publish_to_pypi:
+  image: ghcr.io/astral-sh/uv:0.12.19-python3.14-trixie-slim
+  # The trusted publisher on PyPI is scoped to this environment name.
+  environment: pypi
+  id_tokens:
+    PYPI_ID_TOKEN:
+      aud: pypi
+  before_script:
+    # opencv-python needs these shared libraries to import, even headless.
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends libgl1 libglib2.0-0 > /dev/null
+  script:
+    # The tag must match the version being built, or PyPI would get a mislabeled release.
+    - test "v$(uv version --short)" = "$CI_COMMIT_TAG" || { echo "Tag $CI_COMMIT_TAG does not match pyproject version $(uv version --short)"; exit 1; }
+    - uv run --extra test pytest -q
+    - uv build
+    # Exchange the GitLab identity token for a PyPI API token that expires in minutes:
+    # https://docs.pypi.org/trusted-publishers/using-a-publisher/#gitlab-cicd
+    - |
+      PYPI_API_TOKEN=$(uv run --no-project python - <<'EOF'
+      import json, os, urllib.request
+      request = urllib.request.Request(
+          "https://pypi.org/_/oidc/mint-token",
+          data=json.dumps({"token": os.environ["PYPI_ID_TOKEN"]}).encode(),
+          headers={"Content-Type": "application/json"},
+      )
+      print(json.load(urllib.request.urlopen(request))["token"])
+      EOF
+      )
+    - uv publish --token "$PYPI_API_TOKEN"
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/

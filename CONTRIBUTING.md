@@ -108,16 +108,10 @@ uv run pre-commit run --all-files
 
 ### Building the package
 
-To build the package, you'll need the build tool installed
+Build the package with uv:
 
 ```bash
-uv pip install build
-```
-
-Then build your package:
-
-```bash
-python -m build
+uv build
 ```
 
 This creates two files in a new dist/ directory:
@@ -138,7 +132,7 @@ source test-geotiff-env/bin/activate
 Then, install your package from the wheel file
 
 ```bash
-uv pip install ~/git/geotiff-to-wavetable-converter/dist/geotiff_to_wavetable-0.1.0-py3-none-any.whl
+uv pip install ~/git/geotiff-to-wavetable-converter/dist/geotiff_to_wavetable-*-py3-none-any.whl
 ```
 
 We can now test that the CLI functions properly:
@@ -156,33 +150,35 @@ deactivate
 rm -rf test-geotiff-env
 ```
 
-### Uploading to PyPI
+### Releasing to PyPI
 
-1. Install `twine` (the upload tool):
+Releases publish automatically from GitLab CI. Pushing a version tag runs the `publish_to_pypi` job, which checks that the tag matches the version in `pyproject.toml`, runs the tests, builds, and uploads. There's no API token to manage: PyPI trusts this repository's CI through a [trusted publisher](https://docs.pypi.org/trusted-publishers/).
 
-   ```bash
-   uv pip install twine
-   ```
-
-2. Create a PyPI account (if you don't have one):
-
-   - Go to <https://pypi.org/account/register/>
-   - Create account and verify your email
-
-3. Create an API token:
-
-   - Go to <https://pypi.org/manage/account/>
-   - Scroll to "API tokens"
-   - Click "Add API token"
-   - Name: geotiff-to-wavetable
-   - Scope: "Entire account" (for first upload)
-   - Copy the token
-
-4. Upload your package:
+1. Bump the version and add a section to `CHANGELOG.md`:
 
    ```bash
-   cd ~/git/geotiff-to-wavetable-converter
-   twine upload dist/*
+   uv version --bump minor   # or patch / major
    ```
 
-   It will prompt for your API token.
+2. Merge that change to `main`, then tag the merge and push the tag:
+
+   ```bash
+   git switch main && git pull
+   git tag -a "v$(uv version --short)" -m "v$(uv version --short)"
+   git push origin "v$(uv version --short)"
+   ```
+
+3. Watch the tag's pipeline, then confirm the release at <https://pypi.org/project/geotiff-to-wavetable/>.
+
+PyPI never lets a version number be reused, even after a release is deleted, so fix a bad release by publishing the next patch version.
+
+#### One-time setup: the trusted publisher
+
+On PyPI, open **geotiff-to-wavetable → Manage → Publishing → Add a new publisher → GitLab** and enter:
+
+| Field                        | Value                            |
+| ---------------------------- | -------------------------------- |
+| Namespace                    | `colby.goettel`                  |
+| Project name                 | `geotiff-to-wavetable-converter` |
+| Top-level pipeline file path | `.gitlab-ci.yml`                 |
+| Environment name             | `pypi`                           |
