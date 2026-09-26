@@ -162,7 +162,17 @@ def _normalize_to_int16(bands: npt.NDArray[np.float64]) -> npt.NDArray[np.int16]
 
     Returns:
         A 2D int16 array spanning the full int16 range.
+
+    Raises:
+        ValueError: if the array is flat (every value equal). Rescaling would divide
+            by zero, and the NaNs cast silently to an all-zero, silent wavetable.
     """
+    if bands.max() == bands.min():
+        logger.error(f"Band is flat (every sample is {bands.min()}); the wavetable would be silent.")
+        raise ValueError(
+            f"The selected band is flat (every value is {bands.min()}), so the wavetable would be silent. "
+            "Try a different band or file."
+        )
     normalized = (bands - bands.min()) / (bands.max() - bands.min())
     scaled = normalized * 65535 - 32768
     result: npt.NDArray[np.int16] = scaled.astype(np.int16)
