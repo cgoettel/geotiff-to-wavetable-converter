@@ -58,6 +58,18 @@ geotiff-to-wavetable examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif
 
 By default, each row of the raster (top to bottom) becomes one wave frame. With `-c`/`--columns`, each column (left to right) does instead. It's the same data turned 90 degrees, and it makes a different instrument.
 
+**Set the wave size** (samples per frame):
+
+```bash
+geotiff-to-wavetable examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif -w 256
+```
+
+`-w`/`--wave-size` takes a power of 2 from 2 to 4096. By default it's the raster's width rounded up to a power of 2, capped at 4096. The number of frames still follows the raster's height, capped at 512. How to choose:
+
+- **Sound:** fewer samples per frame means less detail in each waveform, which sounds crunchier and more lo-fi. At 8 or 16 samples the terrain is reduced to a handful of steps, and it sounds like it. Large sizes keep the fine texture of the land (or the scan).
+- **File size:** the file is 2 bytes × wave size × frame count, so it scales directly with `-w`. A full 4096 × 512 table is about 4 MB, and `-w 256` on the same raster is about 256 KB.
+- **Synthesizer support:** Surge reads anything from 2 to 4096. Some synthesizers resample every table to a fixed internal size (often 2048), so on those, very large sizes add file weight without adding detail.
+
 **View file information** (bands and their colors, width, height):
 
 ```bash

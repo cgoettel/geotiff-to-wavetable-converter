@@ -13,10 +13,25 @@ from rasterio.errors import NotGeoreferencedWarning
 from geotiff_to_wavetable.converter import array_to_wavetable
 from geotiff_to_wavetable.io_utils import display_info, visualize, write_wt_file
 from geotiff_to_wavetable.loaders import load_from_geotiff
-from geotiff_to_wavetable.validators import is_band_in_band
+from geotiff_to_wavetable.validators import is_band_in_band, validate_wave_size
 
 # Set up logger
 logger = logging.getLogger(__name__)
+
+
+def wave_size_argument(value: str) -> int:
+    """Argparse type for -w/--wave-size: a power of 2 in [2, 4096].
+
+    Validating here (rather than in the converter) makes a bad value fail before
+    the raster is read, with argparse's usage line.
+    """
+    try:
+        wave_size = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value!r} is not a whole number") from None
+    if not validate_wave_size(wave_size):
+        raise argparse.ArgumentTypeError(f"{wave_size} is not a power of 2 between 2 and 4096")
+    return wave_size
 
 
 def main() -> None:
@@ -86,6 +101,16 @@ def main() -> None:
         help="The filename (relative or absolute) of the output file. Default: INPUT_FILE.wt",
     )
     parser.add_argument(
+        "-w",
+        "--wave-size",
+        type=wave_size_argument,
+        default=None,
+        help=(
+            "Samples per wave frame: a power of 2 from 2 to 4096. Smaller sizes sound crunchier and lo-fi, and make "
+            "smaller files. Default: the raster's width rounded up to a power of 2, capped at 4096."
+        ),
+    )
+    parser.add_argument(
         "-v",
         "--visualize",
         action="store_true",
@@ -136,7 +161,7 @@ def main() -> None:
         logger.info("Reading columns as wave frames (--columns).")
         array = np.ascontiguousarray(array.T)
     try:
-        samples, wave_size, wave_count = array_to_wavetable(array, nodata=src.nodata)
+        samples, wave_size, wave_count = array_to_wavetable(array, nodata=src.nodata, wave_size=args.wave_size)
     except ValueError as error:
         # Unusable input (e.g. an all-nodata band): exit with the message instead of a traceback, matching the
         # other CLI errors.

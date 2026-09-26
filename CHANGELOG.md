@@ -8,6 +8,7 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 
 - **Images and scans.** Photos and scans (JPEG, PNG, WebP, BMP, GIF, TIFF) convert by brightness (Rec. 709 luma) by default. `-b 1/2/3` picks a single color channel, palette images convert through their color table, and alpha is ignored.
 - `-c`/`--columns` reads the raster left to right, one column per wave frame.
+- `-w`/`--wave-size` sets the samples per wave frame (a power of 2 from 2 to 4096), trading detail for crunch and file size. `array_to_wavetable` takes a matching `wave_size` argument.
 - `-i` lists each band's color interpretation, for example `Bands: 3 (red, green, blue)`.
 - `python -m geotiff_to_wavetable` works as an alternative to the `geotiff-to-wavetable` command.
 - `load_from_geotiff` and `array_to_wavetable` split reading a raster from converting it, so new source formats can reuse the conversion.
@@ -25,6 +26,7 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 - A flat band (every value equal) wrote a silent wavetable. It now exits with an error.
 - An all-nodata band exited with a traceback. It now exits with an error message.
 - `-b 0` was silently ignored and negative bands crashed. Both now exit with an error.
+- `validate_wave_size` raised a math domain error on 0 and negative numbers instead of returning `False`.
 
 ## [0.1.1] - 2026-01-05
 
