@@ -10,6 +10,7 @@ from geotiff_to_wavetable.converter import (
 from geotiff_to_wavetable.io_utils import (
     display_info,
     visualize,
+    write_wav_file,
     write_wt_file,
 )
 from geotiff_to_wavetable.loaders import (
@@ -31,5 +32,6 @@ __all__ = [
     "load_from_geotiff",
     "validate_wave_size",
     "visualize",
+    "write_wav_file",
     "write_wt_file",
 ]

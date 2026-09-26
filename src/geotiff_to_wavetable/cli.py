@@ -4,6 +4,7 @@ import argparse
 import logging
 import sys
 import warnings
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -11,7 +12,7 @@ import rasterio
 from rasterio.errors import NotGeoreferencedWarning
 
 from geotiff_to_wavetable.converter import array_to_wavetable
-from geotiff_to_wavetable.io_utils import display_info, visualize, write_wt_file
+from geotiff_to_wavetable.io_utils import display_info, visualize, write_wav_file, write_wt_file
 from geotiff_to_wavetable.loaders import load_from_geotiff
 from geotiff_to_wavetable.validators import is_band_in_band, validate_wave_size
 
@@ -32,6 +33,34 @@ def wave_size_argument(value: str) -> int:
     if not validate_wave_size(wave_size):
         raise argparse.ArgumentTypeError(f"{wave_size} is not a power of 2 between 2 and 4096")
     return wave_size
+
+
+FORMATS = ("wt", "wav")
+
+
+def formats_argument(value: str) -> tuple[str, ...]:
+    """Argparse type for -f/--format: a comma-separated subset of FORMATS, in order, duplicates dropped."""
+    formats = tuple(dict.fromkeys(part.strip().lower() for part in value.split(",") if part.strip()))
+    unknown = [fmt for fmt in formats if fmt not in FORMATS]
+    if not formats or unknown:
+        raise argparse.ArgumentTypeError(f"{value!r}: choose from {', '.join(FORMATS)}, comma-separated")
+    return formats
+
+
+def output_paths(input_file: str, output_file: str | None, formats: tuple[str, ...]) -> dict[str, str]:
+    """Work out where each requested format gets written.
+
+    - No -o: next to the input, with the format's extension (with_suffix swaps only the final extension, so
+      dotted directories and stems like ./dem.tif, v1.2/dem.tif, dem.v2.tif keep their names).
+    - -o with one format: exactly the path given.
+    - -o with several formats: the -o path with each format's extension, so `-f wt,wav -o out.wav` writes
+      out.wt and out.wav.
+    """
+    if output_file is None:
+        return {fmt: str(Path(input_file).with_suffix(f".{fmt}")) for fmt in formats}
+    if len(formats) == 1:
+        return {formats[0]: output_file}
+    return {fmt: str(Path(output_file).with_suffix(f".{fmt}")) for fmt in formats}
 
 
 def main() -> None:
@@ -98,7 +127,21 @@ def main() -> None:
     parser.add_argument(
         "-o",
         "--output-file",
-        help="The filename (relative or absolute) of the output file. Default: INPUT_FILE.wt",
+        help=(
+            "The filename (relative or absolute) of the output file. Default: INPUT_FILE.wt (or .wav, per -f). "
+            "With several formats, each gets this path with its own extension."
+        ),
+    )
+    parser.add_argument(
+        "-f",
+        "--format",
+        type=formats_argument,
+        default=("wt",),
+        help=(
+            "Output format(s), comma-separated: wt (a wavetable for Bitwig, Surge, and other software synthesizers) "
+            "and/or wav (every frame back to back in a mono 16-bit 44.1 kHz WAV, for hardware samplers like the "
+            "M8, MPC, or OP-1). Example: -f wt,wav. Default: wt"
+        ),
     )
     parser.add_argument(
         "-w",
@@ -140,19 +183,14 @@ def main() -> None:
     if args.info:
         display_info(src)
         sys.exit(0)
-    # -o, --output-file.
-    # If the user does not specify an output file, save the wavetable to the same path and name as the input file,
-    # but with the .wt file extension.
-    # with_suffix swaps only the final extension, so dotted directories and stems (./dem.tif, v1.2/dem.tif,
-    # dem.v2.tif) keep their names.
-    if args.output_file is None:
-        args.output_file = str(Path(args.input_file).with_suffix(".wt"))
+    # -o, --output-file and -f, --format: one output path per requested format (see output_paths).
+    outputs = output_paths(args.input_file, args.output_file, args.format)
     if args.visualize:
         visualize(src)
         sys.exit(0)
 
     band = "auto" if args.band is None else args.band
-    logger.info(f"Converting band {band} from {args.input_file} to {args.output_file}...")
+    logger.info(f"Converting band {band} from {args.input_file} to {', '.join(outputs.values())}...")
 
     array = load_from_geotiff(src, args.band)
     # -c, --columns. Transposing turns columns into rows, so each column becomes a wave frame. Copy to a contiguous
@@ -166,7 +204,9 @@ def main() -> None:
         # Unusable input (e.g. an all-nodata band): exit with the message instead of a traceback, matching the
         # other CLI errors.
         sys.exit(f"ERROR: {error}")
-    write_wt_file(args.output_file, samples, wave_size, wave_count)
+    writers: dict[str, Callable[[str, list[bytes], int, int], None]] = {"wt": write_wt_file, "wav": write_wav_file}
+    for fmt, path in outputs.items():
+        writers[fmt](path, samples, wave_size, wave_count)
 
 
 if __name__ == "__main__":

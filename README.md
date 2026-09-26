@@ -131,31 +131,37 @@ Then, in Bitwig:
 
 You can also drag your wavetable file into the wavetable part of the oscillator.
 
+### Hardware samplers (M8, MPC, OP-1, etc.)
+
+Hardware samplers like the Dirtywave M8, Akai MPC, Teenage Engineering OP-1, and Polyend Tracker can't read `.wt` files, but they all play WAVs. Ask for one with `-f wav`:
+
+```bash
+geotiff-to-wavetable examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif -f wav
+```
+
+Use `-f wt,wav` to get both from one run.
+
+The WAV is mono, 16-bit, 44.1 kHz, with every wave frame laid end to end. It holds sample-for-sample the same data as the `.wt`. A wavetable synthesizer lets you choose which frame to play; a sampler plays straight through the WAV, so you hear the terrain (or the poster) evolving over time. Loop it and it keeps cycling.
+
+- **Dirtywave M8:** load it into a Sampler instrument and set `PLAY` to `FWDLOOP`, or to `REPITCH`/`BPM` to lock it to the song.
+- **Other samplers:** use a forward-looping playback mode. The file has no loop points in it; the sampler's own loop settings handle that.
+
+**Pitch and length:** at 44.1 kHz, each frame of `N` samples repeats `44100 ÷ N` times a second, which sets the pitch you hear: 2048 samples gives about 21.5 Hz (a low rumble), 256 about 172 Hz, 128 about 345 Hz. So `-w` doubles as a tuning control. The file lasts `N × frames ÷ 44100` seconds: about 48 seconds at 4096 × 512, 3 seconds at 256 × 512. A sampler treats the whole file as one chromatic sample, so playing it higher speeds up the scan as well as raising the pitch.
+
 ## Finding geospatial data
 
-Here are some sources for dense GeoTIFF data:
+Where to get elevation data, in the order to try them:
 
-1. [USGS Elevation](https://apps.nationalmap.gov/downloader/)
-   - Filter by: GeoTIFF, Elevation Products (DEM)
-   - Choose interesting terrain: mountains, canyons, volcanoes
-   - 1-arc-second resolution is good
-2. [OpenTopography](https://opentopography.org/)
-   - High-resolution LiDAR elevation data
-   - Great for detailed terrain
-   - Requires free account
-3. [SRTM (Shuttle Radar Topography Mission)](https://dwtkns.com/srtm30m/)
-   - Global elevation data, 30m resolution
-   - Has an easy browser
-   - Download tiles covering interesting places
-4. [NASA ASTER GDEM](https://asterweb.jpl.nasa.gov/gdem.asp)
-   - Global elevation
-   - Higher resolution than SRTM
+1. **Start here: [SRTM 30m tile browser](https://dwtkns.com/srtm30m/).** It's the fastest route to anywhere on Earth: click a 1° tile on a world map and download it. It covers nearly all land between 60° N and 56° S at 30 m resolution, including places the USGS downloader comes up empty for (Kauai and the rest of Hawaii download cleanly here). You need a free [NASA Earthdata login](https://urs.earthdata.nasa.gov/users/new) to download. SRTM tiles are int16 with a `-32768` nodata value, which the tool handles.
+2. **Backup: [NASA ASTER GDEM](https://asterweb.jpl.nasa.gov/gdem.asp).** Also global and also 30 m, with wider coverage toward the poles (83° N to 83° S). Worth trying when SRTM has gaps, such as far-northern terrain or steep mountains.
+3. **Deepest catalog: [OpenTopography](https://opentopography.org/).** High-resolution LiDAR, bathymetry, and more, for when 30 m isn't detailed enough. Requires a free account.
+4. **United States, no account: [USGS National Map downloader](https://apps.nationalmap.gov/downloader/).** Filter by elevation products (DEM) in GeoTIFF format. 1-arc-second data is a good size. See the walkthrough below.
 
 > 💡 **Pro tips**
 >
-> - Avoid: Ocean/water data, cloud/atmospheric data, sparse measurements
-> - Look for: Elevation (DEM), bathymetry, land surface temperature
-> - Interesting terrain: Iceland volcanoes, Grand Canyon, Himalayas, Hawaiian islands
+> - Avoid: ocean/water data, cloud/atmospheric data, sparse measurements
+> - Look for: elevation (DEM), bathymetry, land surface temperature
+> - Interesting terrain: Iceland's volcanoes, the Grand Canyon, the Himalayas, the Hawaiian islands (via SRTM)
 
 ### An example of getting a GeoTIFF from USGS
 

@@ -13,6 +13,7 @@ import logging
 import subprocess
 import sys
 import warnings
+import wave
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -514,3 +515,60 @@ def test_invalid_wave_size_is_a_usage_error(
     assert exc_info.value.code == 2
     assert "-w/--wave-size" in capsys.readouterr().err
     assert not list(tmp_path.glob("*.wt"))
+
+
+# --- WAV output for hardware samplers ----------------------------------------------------------
+
+
+def read_wav(path: Path) -> tuple[int, int, int, npt.NDArray[np.int16]]:
+    """Return (channels, sample width in bytes, sample rate, samples) from a WAV file."""
+    with wave.open(str(path), "rb") as wav:
+        samples = np.frombuffer(wav.readframes(wav.getnframes()), dtype="<i2")
+        return wav.getnchannels(), wav.getsampwidth(), wav.getframerate(), samples
+
+
+def test_wav_format_writes_sampler_ready_wav(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """-f wav writes a mono 16-bit 44.1 kHz WAV next to the input, lasting wave_size x wave_count samples."""
+    source = write_geotiff(tmp_path / "terrain.tif", gradient(24, 300))
+
+    run_cli(monkeypatch, tmp_path, str(source), "-f", "wav")
+
+    channels, width, rate, samples = read_wav(tmp_path / "terrain.wav")
+    assert (channels, width, rate) == (1, 2, 44100)
+    assert samples.size == 512 * 24
+    assert samples.min() == -32768
+    assert samples.max() == 32767
+    assert not (tmp_path / "terrain.wt").exists()
+
+
+def test_wav_samples_match_wt_payload(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """-f wt,wav -o out.wav writes out.wt and out.wav holding sample-for-sample the same table."""
+    source = write_geotiff(tmp_path / "terrain.tif", gradient(16, 64))
+
+    run_cli(monkeypatch, tmp_path, str(source), "-f", "wt,wav", "-o", "out.wav")
+
+    wavetable = read_wt(tmp_path / "out.wt")
+    _, _, _, samples = read_wav(tmp_path / "out.wav")
+    np.testing.assert_array_equal(samples, wavetable.samples)
+
+
+def test_wav_respects_wave_size(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """-w changes the WAV's frame length, and so its duration, just like the .wt."""
+    source = write_geotiff(tmp_path / "terrain.tif", gradient(10, 300))
+
+    run_cli(monkeypatch, tmp_path, str(source), "-f", "wav", "-w", "32", "-o", "crunch.wav")
+
+    _, _, _, samples = read_wav(tmp_path / "crunch.wav")
+    assert samples.size == 32 * 10
+
+
+@pytest.mark.parametrize("formats", ["mp3", "wt,flac", ",", ""])
+def test_unknown_format_is_a_usage_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], formats: str
+) -> None:
+    """A bad -f fails in argparse (exit 2) before anything is read or written."""
+    with pytest.raises(SystemExit) as exc_info:
+        run_cli(monkeypatch, tmp_path, "does-not-exist.tif", "-f", formats)
+
+    assert exc_info.value.code == 2
+    assert "-f/--format" in capsys.readouterr().err
