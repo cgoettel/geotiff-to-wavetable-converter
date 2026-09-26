@@ -2,6 +2,8 @@
 
 This is a utility to convert GeoTIFF files to wavetable files (`.wt`) for use in synthesizers.
 
+Despite the name, GeoTIFFs aren't the only way in: photos and scans (JPEG, PNG, WebP, and more) work too. Scan a poster, a wall, or a texture and play it. See [Images and scans](#images-and-scans).
+
 I've never worked with GeoTIFF and my wavetable experience is limited. Huge shout-out to both [`okwt`](https://github.com/drzhnn/okwt/tree/main) and [`surge`](https://github.com/surge-synthesizer/surge/tree/main) for their helpful implementations.
 
 If you'd like to help or if you've noticed some issues, please see the [CONTRIBUTING guide](CONTRIBUTING.md) for information about how to go forward.
@@ -48,7 +50,15 @@ geotiff-to-wavetable examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif
 
 Most elevation data only has one band, so you won't need this option. Use `-i` to see how many bands your file has.
 
-**View file information** (bands, width, height):
+**Read columns instead of rows:**
+
+```bash
+geotiff-to-wavetable examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif -c
+```
+
+By default, each row of the raster (top to bottom) becomes one wave frame. With `-c`/`--columns`, each column (left to right) does instead. It's the same data turned 90 degrees, and it makes a different instrument.
+
+**View file information** (bands and their colors, width, height):
 
 ```bash
 geotiff-to-wavetable examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif -i
@@ -69,6 +79,27 @@ geotiff-to-wavetable examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif
 ```
 
 This opens a plot showing your elevation data. It's a helpful first step to make sure Python can read your file and that it contains the terrain you expect. If it doesn't look right, make sure to check how many bands there are (`-i`) and then view the other bands.
+
+### Images and scans
+
+Anything GDAL can read works as input: JPEG, PNG, WebP, BMP, GIF, and TIFF, georeferenced or not. A portable scanner and a city full of posters is a sample library.
+
+```bash
+geotiff-to-wavetable poster.jpg
+```
+
+How images are read:
+
+- **Brightness by default.** Color images convert by their luma, the perceived brightness (Rec. 709: 0.2126 red + 0.7152 green + 0.0722 blue). Dark ink on light paper reads the way your eye sees it. Transparency (alpha) is ignored.
+- **One color channel with `-b`.** On a color image, `-b 1`, `-b 2`, and `-b 3` pick red, green, and blue alone. The same poster can sound quite different through each one. `-i` lists which band is which color.
+- **Indexed images** (most GIFs and some PNGs) are converted through their color table, so they convert by their actual colors.
+- **Blank images are refused.** A scan with no variation at all, such as a white wall, would make a silent wavetable, so the tool exits with an error instead.
+
+Scanning tips:
+
+- **Resolution:** the output is at most 4096 samples wide and 512 frames tall, so 300 dpi is plenty for anything poster-sized.
+- **Bit depth:** photos are usually 8-bit, which gives 256 brightness levels. That sounds a little stepped and gritty, which may be exactly what you want. For smoother tables, have the scanner save 16-bit TIFF.
+- **Formats the tool can't read:** iPhone HEIC photos and PDFs from scanner apps need converting first, e.g. `magick scan.heic scan.png` ([ImageMagick](https://imagemagick.org/)).
 
 ### Importing into Bitwig
 

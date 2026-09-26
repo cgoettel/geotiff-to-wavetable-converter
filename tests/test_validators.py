@@ -53,3 +53,12 @@ def test_is_band_in_band_exceeds_count_exits_with_plural_bands() -> None:
     with pytest.raises(SystemExit) as exc_info:
         is_band_in_band(dataset, user_specified_band=5)
     assert "3 bands" in str(exc_info.value)
+
+
+@pytest.mark.parametrize("band", [0, -1])
+def test_is_band_in_band_below_one_exits(band: int) -> None:
+    dataset = MagicMock()
+    dataset.count = 3
+    with pytest.raises(SystemExit) as exc_info:
+        is_band_in_band(dataset, user_specified_band=band)
+    assert "numbered from 1" in str(exc_info.value)

@@ -12,6 +12,7 @@ good (or loads in Bitwig) still needs human ears — see docs/manual-validation.
 import logging
 import subprocess
 import sys
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,6 +20,7 @@ import numpy as np
 import numpy.typing as npt
 import pytest
 import rasterio
+from rasterio.errors import NotGeoreferencedWarning
 from rasterio.transform import from_origin
 
 from geotiff_to_wavetable.cli import main
@@ -197,7 +199,11 @@ def test_info_prints_metadata_and_writes_nothing(
         run_cli(monkeypatch, tmp_path, str(source), "-i")
 
     assert exc_info.value.code == 0
-    assert capsys.readouterr().out.splitlines() == ["Bands: 3", "Width: 30", "Height: 20"]
+    assert capsys.readouterr().out.splitlines() == [
+        "Bands: 3 (gray, undefined, undefined)",
+        "Width: 30",
+        "Height: 20",
+    ]
     assert not list(tmp_path.glob("*.wt"))
 
 
@@ -326,3 +332,157 @@ def test_flat_raster_exits_with_error(
     assert isinstance(exc_info.value.code, str)
     assert exc_info.value.code.startswith("ERROR: The selected band is flat")
     assert not (tmp_path / "out.wt").exists()
+
+
+# --- Images and scans --------------------------------------------------------------------------
+
+
+def write_image(
+    path: Path,
+    bands: npt.NDArray[np.uint8],
+    colormap: dict[int, tuple[int, int, int, int]] | None = None,
+) -> Path:
+    """Write a plain, non-georeferenced image (PNG or JPEG), like a phone photo or a scanner's output."""
+    count, height, width = bands.shape
+    driver = "JPEG" if path.suffix == ".jpg" else "PNG"
+    # No georeferencing is the point here, so rasterio's warning about it is expected.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", NotGeoreferencedWarning)
+        image = rasterio.open(path, "w", driver=driver, width=width, height=height, count=count, dtype="uint8")
+    with image:
+        image.write(bands)
+        if colormap is not None:
+            image.write_colormap(1, colormap)
+    return path
+
+
+def poster(height: int = 24, width: int = 40) -> npt.NDArray[np.uint8]:
+    """Blue ink on white paper: red is 255 everywhere, so the red channel alone is flat.
+
+    Green and blue dip together where the ink is, in a pattern that varies across
+    both axes.
+    """
+    rows, cols = np.mgrid[0:height, 0:width]
+    ink = ((np.sin(cols / 3.0) + np.cos(rows / 4.0)) > 0.5).astype(np.float64) * (cols + rows) / (width + height)
+    red = np.full((height, width), 255.0)
+    green = 255.0 - 200.0 * ink
+    blue = 255.0 - 60.0 * ink
+    return np.stack([red, green, blue]).astype(np.uint8)
+
+
+def luma(rgb: npt.NDArray[np.generic]) -> npt.NDArray[np.float64]:
+    """Rec. 709 luma, computed independently of the loader."""
+    red, green, blue = (channel.astype(np.float64) for channel in rgb[:3])
+    result: npt.NDArray[np.float64] = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+    return result
+
+
+def convert(monkeypatch: pytest.MonkeyPatch, cwd: Path, source: Path, *options: str) -> npt.NDArray[np.int32]:
+    """Run the CLI on `source` and return the output samples (int32, so they can be subtracted)."""
+    output = cwd / f"{source.stem}{''.join(options)}.wt"
+    run_cli(monkeypatch, cwd, str(source), "-o", str(output), *options)
+    wavetable = read_wt(output)
+    assert_valid_wavetable(wavetable)
+    return wavetable.samples.astype(np.int32)
+
+
+def test_color_image_defaults_to_brightness(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without -b, a color image converts by brightness rather than its (here flat) red channel."""
+    image = poster()
+    source = write_image(tmp_path / "poster.png", image)
+    reference = write_geotiff(tmp_path / "luma.tif", luma(image).astype(np.float32), nodata=None)
+
+    # float32 vs float64 luma can land a sample on either side of an int16 boundary.
+    np.testing.assert_allclose(
+        convert(monkeypatch, tmp_path, source), convert(monkeypatch, tmp_path, reference), atol=1
+    )
+
+
+def test_band_option_picks_one_color_channel(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """-b 2 on a color image is its green channel alone; -b 1 here is flat red and refuses."""
+    image = poster()
+    source = write_image(tmp_path / "poster.png", image)
+    green = write_geotiff(tmp_path / "green.tif", image[1], nodata=None)
+
+    np.testing.assert_array_equal(
+        convert(monkeypatch, tmp_path, source, "-b", "2"), convert(monkeypatch, tmp_path, green)
+    )
+    with pytest.raises(SystemExit, match="flat"):
+        run_cli(monkeypatch, tmp_path, str(source), "-b", "1")
+
+
+def test_alpha_channel_is_ignored(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An RGBA image converts exactly like the same image without alpha."""
+    image = poster()
+    alpha = np.linspace(0, 255, image[0].size).reshape(image[0].shape).astype(np.uint8)
+    rgba = write_image(tmp_path / "rgba.png", np.concatenate([image, alpha[np.newaxis]]))
+    rgb = write_image(tmp_path / "rgb.png", image)
+
+    np.testing.assert_array_equal(convert(monkeypatch, tmp_path, rgba), convert(monkeypatch, tmp_path, rgb))
+
+
+def test_palette_image_uses_colors_not_indices(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Palette images (GIFs, indexed PNGs) convert by the colors their indices point to.
+
+    The palette is deliberately out of brightness order, so reading raw indices
+    would give a different wavetable.
+    """
+    palette = {0: (255, 255, 255, 255), 1: (0, 0, 0, 255), 2: (128, 128, 128, 255), 3: (40, 200, 90, 255)}
+    rows, cols = np.mgrid[0:16, 0:32]
+    indices = ((rows // 3 + cols // 5) % 4).astype(np.uint8)
+    source = write_image(tmp_path / "indexed.png", indices[np.newaxis], colormap=palette)
+    colors = np.array([palette[i][:3] for i in range(4)], dtype=np.float64)[indices]
+    reference = write_geotiff(tmp_path / "colors.tif", luma(np.moveaxis(colors, -1, 0)).astype(np.float32), nodata=None)
+
+    np.testing.assert_allclose(
+        convert(monkeypatch, tmp_path, source), convert(monkeypatch, tmp_path, reference), atol=1
+    )
+
+
+def test_columns_option_reads_left_to_right(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """--columns makes each column a wave frame: identical to converting the transposed image."""
+    data = gradient(24, 40)
+    source = write_geotiff(tmp_path / "terrain.tif", data)
+    transposed = write_geotiff(tmp_path / "transposed.tif", np.ascontiguousarray(data.T))
+
+    by_columns = convert(monkeypatch, tmp_path, source, "--columns")
+    np.testing.assert_array_equal(by_columns, convert(monkeypatch, tmp_path, transposed))
+    wavetable = read_wt(tmp_path / "terrain--columns.wt")
+    assert (wavetable.wave_size, wavetable.wave_count) == (32, 40)
+
+
+def test_blank_scan_exits_with_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A scan of a blank white wall has nothing to hear, so it gets the flat-band error."""
+    source = write_image(tmp_path / "wall.png", np.full((3, 16, 16), 255, dtype=np.uint8))
+
+    with pytest.raises(SystemExit, match="flat"):
+        run_cli(monkeypatch, tmp_path, str(source))
+
+
+def test_info_on_photo_names_color_channels(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """-i shows which band is which color, so -b 1/2/3 is discoverable."""
+    source = write_image(tmp_path / "poster.png", poster())
+
+    with pytest.raises(SystemExit):
+        run_cli(monkeypatch, tmp_path, str(source), "-i")
+
+    assert capsys.readouterr().out.splitlines()[0] == "Bands: 3 (red, green, blue)"
+
+
+def test_jpeg_photo_converts_quietly(tmp_path: Path) -> None:
+    """A JPEG photo converts end to end, with no georeferencing warning on the console."""
+    source = write_image(tmp_path / "photo.jpg", poster(48, 64))
+
+    result = subprocess.run(
+        [sys.executable, "-m", "geotiff_to_wavetable", str(source)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert_valid_wavetable(read_wt(tmp_path / "photo.wt"))
