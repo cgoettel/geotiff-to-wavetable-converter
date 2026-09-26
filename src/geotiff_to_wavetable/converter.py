@@ -11,6 +11,8 @@ import cv2
 import numpy as np
 import numpy.typing as npt
 
+from geotiff_to_wavetable.validators import validate_wave_size
+
 logger = logging.getLogger(__name__)
 
 
@@ -138,7 +140,8 @@ def _resize_for_wavetable(
         A 2D array of shape (target_height, target_width), clipped to the valid range.
     """
     logger.debug(f"Resizing {bands.shape} -> ({target_height}, {target_width}); clip range=[{valid_min}, {valid_max}]")
-    # TODO: (issue #4) add a flag to switch interpolation algorithms.
+    # TODO: add a flag to switch interpolation algorithms (e.g. INTER_AREA averages when shrinking, where cubic
+    # just picks points, which matters most for small -w/--wave-size values).
     # https://stackoverflow.com/questions/48121916/numpy-resize-rescale-image
     # cv2.resize preserves dtype at runtime, but its stubs widen it to integer|floating.
     # Cast is safe because `bands` is guaranteed float64 by the signature above.
@@ -186,6 +189,7 @@ def _normalize_to_int16(bands: npt.NDArray[np.float64]) -> npt.NDArray[np.int16]
 def array_to_wavetable(
     array: npt.NDArray[np.float64],
     nodata: float | None = None,
+    wave_size: int | None = None,
 ) -> tuple[list[bytes], int, int]:
     """Convert a raw 2D array into wavetable byte data.
 
@@ -196,11 +200,20 @@ def array_to_wavetable(
         array: A 2D array of raw sample data (e.g. elevation values).
         nodata: The sentinel value representing "no data", or None if the
             array has no nodata values.
+        wave_size: Samples per wave frame: a power of 2 in [2, 4096]. None picks
+            the array's width rounded up to a power of 2 (capped at 4096).
 
     Returns:
         A tuple of (byte frames list, wave size / width, wave count / height)
         suitable for passing to `write_wt_file`.
+
+    Raises:
+        ValueError: if `wave_size` isn't a power of 2 in [2, 4096], or the data
+            is unusable (all nodata, or flat).
     """
+    if wave_size is not None and not validate_wave_size(wave_size):
+        raise ValueError(f"Wave size must be a power of 2 between 2 and 4096; got {wave_size}.")
+
     height, width = array.shape
     logger.info(f"Converting {height}x{width} array to wavetable (nodata={nodata}).")
 
@@ -212,7 +225,10 @@ def array_to_wavetable(
     valid_min = cleaned.min()
     valid_max = cleaned.max()
 
-    wave_size = calculate_width(width)
+    if wave_size is None:
+        wave_size = calculate_width(width)
+    else:
+        logger.info(f"Using requested wave size {wave_size} (natural size would be {calculate_width(width)}).")
     wave_count = calculate_height(height)
 
     resized = _resize_for_wavetable(cleaned, wave_size, wave_count, valid_min, valid_max)

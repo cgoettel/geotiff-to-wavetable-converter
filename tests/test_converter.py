@@ -187,3 +187,19 @@ def test_array_to_wavetable_runs_cleaning_when_nodata_given() -> None:
     array = np.array([row] * 10, dtype=np.float64)
     samples, wave_size, wave_count = array_to_wavetable(array, nodata=-9999.0)
     assert len(samples[0]) == 2 * wave_size * wave_count
+
+
+@pytest.mark.parametrize("wave_size", [2, 64, 4096])
+def test_array_to_wavetable_honors_requested_wave_size(wave_size: int) -> None:
+    """An explicit wave size overrides the width-derived one, shrinking or growing the frames."""
+    array = np.random.default_rng(0).random((8, 300))
+    samples, size, count = array_to_wavetable(array, wave_size=wave_size)
+    assert (size, count) == (wave_size, 8)
+    assert len(samples[0]) == 2 * wave_size * 8
+
+
+@pytest.mark.parametrize("wave_size", [0, 1, 3, 100, 8192, -4])
+def test_array_to_wavetable_rejects_invalid_wave_size(wave_size: int) -> None:
+    array = np.random.default_rng(0).random((8, 300))
+    with pytest.raises(ValueError, match="power of 2"):
+        array_to_wavetable(array, wave_size=wave_size)

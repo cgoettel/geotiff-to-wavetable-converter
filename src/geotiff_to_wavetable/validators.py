@@ -44,7 +44,8 @@ def validate_wave_size(wave_size: int) -> bool:
     Returns:
         True if the wave size is valid, False otherwise.
     """
-    if math.log2(wave_size).is_integer() and wave_size >= 2 and wave_size <= 4096:
+    # Range check first: math.log2 raises on 0 and negative numbers.
+    if 2 <= wave_size <= 4096 and math.log2(wave_size).is_integer():
         return True
     else:
         return False

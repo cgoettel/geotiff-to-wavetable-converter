@@ -486,3 +486,31 @@ def test_jpeg_photo_converts_quietly(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert result.stderr == ""
     assert_valid_wavetable(read_wt(tmp_path / "photo.wt"))
+
+
+# --- Wave size ---------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("wave_size", ["2", "256", "4096"])
+def test_wave_size_option_sets_frame_length(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, wave_size: str) -> None:
+    """-w sets samples per frame regardless of raster width; frame count still follows height."""
+    source = write_geotiff(tmp_path / "terrain.tif", gradient(24, 300))
+
+    run_cli(monkeypatch, tmp_path, str(source), "-w", wave_size, "-o", "out.wt")
+
+    wavetable = read_wt(tmp_path / "out.wt")
+    assert_valid_wavetable(wavetable)
+    assert (wavetable.wave_size, wavetable.wave_count) == (int(wave_size), 24)
+
+
+@pytest.mark.parametrize("wave_size", ["0", "3", "5000", "big"])
+def test_invalid_wave_size_is_a_usage_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], wave_size: str
+) -> None:
+    """A bad -w fails in argparse (exit 2, usage message) before any file is read or written."""
+    with pytest.raises(SystemExit) as exc_info:
+        run_cli(monkeypatch, tmp_path, "does-not-exist.tif", "-w", wave_size)
+
+    assert exc_info.value.code == 2
+    assert "-w/--wave-size" in capsys.readouterr().err
+    assert not list(tmp_path.glob("*.wt"))

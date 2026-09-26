@@ -62,3 +62,9 @@ def test_is_band_in_band_below_one_exits(band: int) -> None:
     with pytest.raises(SystemExit) as exc_info:
         is_band_in_band(dataset, user_specified_band=band)
     assert "numbered from 1" in str(exc_info.value)
+
+
+@pytest.mark.parametrize("wave_size", [0, -1, -8])
+def test_validate_wave_size_rejects_non_positive_without_crashing(wave_size: int) -> None:
+    """math.log2 raises on these; the range check has to come first."""
+    assert validate_wave_size(wave_size) is False
