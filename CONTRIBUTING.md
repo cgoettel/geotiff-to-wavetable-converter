@@ -94,6 +94,8 @@ You can run the tests with the following command:
 uv run pytest
 ```
 
+`tests/test_integration.py` drives the whole command line against synthetic GeoTIFFs and checks the `.wt` bytes against the format spec. It can't judge how a wavetable sounds, so before a release also work through [docs/manual-validation.md](docs/manual-validation.md).
+
 ### Running pre-commit hooks
 
 This project uses pre-commit to enforce code style and quality. You can run the hooks on all files with the following command:

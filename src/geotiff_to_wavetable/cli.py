@@ -3,6 +3,7 @@
 import argparse
 import logging
 import sys
+from pathlib import Path
 
 import rasterio
 
@@ -98,8 +99,10 @@ def main() -> None:
     # -o, --output-file.
     # If the user does not specify an output file, save the wavetable to the same path and name as the input file,
     # but with the .wt file extension.
+    # with_suffix swaps only the final extension, so dotted directories and stems (./dem.tif, v1.2/dem.tif,
+    # dem.v2.tif) keep their names.
     if args.output_file is None:
-        args.output_file = args.input_file.split(".")[0] + ".wt"
+        args.output_file = str(Path(args.input_file).with_suffix(".wt"))
     if args.visualize:
         visualize(src)
         sys.exit(0)
@@ -107,7 +110,12 @@ def main() -> None:
     logger.info(f"Converting band {args.band} from {args.input_file} to {args.output_file}...")
 
     array = load_from_geotiff(src, args.band)
-    samples, wave_size, wave_count = array_to_wavetable(array, nodata=src.nodata)
+    try:
+        samples, wave_size, wave_count = array_to_wavetable(array, nodata=src.nodata)
+    except ValueError as error:
+        # Unusable input (e.g. an all-nodata band): exit with the message instead of a traceback, matching the
+        # other CLI errors.
+        sys.exit(f"ERROR: {error}")
     write_wt_file(args.output_file, samples, wave_size, wave_count)
 
 
