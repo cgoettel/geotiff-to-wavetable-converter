@@ -2,7 +2,7 @@
 
 All notable changes to this project. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.3.0] - 2026-09-26
 
 ### Added
 
@@ -41,3 +41,4 @@ Documentation cleanup for PyPI. (0.1.0, the first PyPI release, went out the sam
 
 [0.1.1]: https://gitlab.com/colby.goettel/geotiff-to-wavetable-converter/-/commit/1b83917
 [0.2.0]: https://gitlab.com/colby.goettel/geotiff-to-wavetable-converter/-/compare/1b83917...v0.2.0
+[0.3.0]: https://gitlab.com/colby.goettel/geotiff-to-wavetable-converter/-/compare/v0.2.0...v0.3.0
