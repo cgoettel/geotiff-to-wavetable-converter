@@ -27,7 +27,9 @@ mirror_to_github:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
 
 publish_to_pypi:
-  image: ghcr.io/astral-sh/uv:0.12.19-python3.14-trixie-slim
+  # Python 3.13, not 3.14: uv.lock pins numpy 2.2.6 (the last release supporting Python 3.10), which ships
+  # no 3.14 wheels, and this slim image has no compiler to build it from source.
+  image: ghcr.io/astral-sh/uv:0.12.19-python3.13-trixie-slim
   # The trusted publisher on PyPI is scoped to this environment name.
   environment: pypi
   id_tokens:
