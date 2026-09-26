@@ -2,6 +2,13 @@
 
 All notable changes to this project. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **WAV output for hardware samplers.** `-f`/`--format` takes `wt`, `wav`, or both (`-f wt,wav`). The WAV is mono 16-bit 44.1 kHz with every frame laid end to end, sample-for-sample the same data as the `.wt`, so samplers like the M8, MPC, and OP-1 play it as a scan through the table. `write_wav_file` is exported for library use.
+- README: a *Hardware samplers* section (playback modes, how `-w` sets pitch and length), and the data sources ranked with SRTM 30m first.
+
 ## [0.2.0] - 2026-09-26
 
 ### Added

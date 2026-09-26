@@ -2,6 +2,7 @@
 
 import logging
 import sys
+import wave
 
 import rasterio
 import rasterio.plot
@@ -86,3 +87,48 @@ def write_wt_file(output_file: str, samples: list[bytes], wave_size: int, wave_c
         # int16 format:   size = 2 * wave_size * wave_count bytes
         for data in samples:
             out_file.write(data)
+
+
+WAV_SAMPLE_RATE = 44100
+
+
+def write_wav_file(
+    output_file: str,
+    samples: list[bytes],
+    wave_size: int,
+    wave_count: int,
+    sample_rate: int = WAV_SAMPLE_RATE,
+) -> None:
+    """Writes the wavetable as a mono 16-bit PCM `.wav`, every frame back to back.
+
+    Hardware samplers (Dirtywave M8, Akai MPC, OP-1, Polyend Tracker, ...) can't read `.wt` files but all play WAVs.
+    Played through, the concatenated single-cycle frames become a scan across the wavetable: the terrain (or
+    scan) evolving over time. The samples are byte-for-byte the `.wt` payload, so both formats hold the same sound.
+
+    Args:
+        output_file: where to write the `.wav` file
+        samples: the int16 frame data, as returned by `array_to_wavetable`
+        wave_size: samples per frame
+        wave_count: number of frames
+        sample_rate: playback rate in Hz. 44.1 kHz is what samplers expect; at that rate one frame of
+            `wave_size` samples repeats at 44100 / wave_size Hz.
+
+    Returns:
+        None
+    """
+    frames = b"".join(samples)
+    expected = 2 * wave_size * wave_count
+    if len(frames) != expected:
+        # A mismatch would mean the frames and the header describe different tables; refuse rather than write it.
+        raise ValueError(
+            f"Expected {expected} bytes for {wave_count} frames of {wave_size} samples; got {len(frames)}."
+        )
+    with wave.open(output_file, "wb") as out_file:
+        out_file.setnchannels(1)
+        out_file.setsampwidth(2)  # 16-bit
+        out_file.setframerate(sample_rate)
+        out_file.writeframes(frames)
+    logger.info(
+        f"Wrote {output_file}: {wave_count} frames x {wave_size} samples, "
+        f"{wave_size * wave_count / sample_rate:.2f} s at {sample_rate} Hz."
+    )
