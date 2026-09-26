@@ -23,6 +23,10 @@ def is_band_in_band(dataset: rasterio.io.DatasetReader, user_specified_band: int
         None
     """
     number_of_bands: int = dataset.count
+    # Bands are 1-indexed. Without this, -b 0 was silently treated as "no band given"
+    # and -b -1 surfaced as a rasterio IndexError.
+    if user_specified_band < 1:
+        sys.exit(f"ERROR: Bands are numbered from 1; got {user_specified_band}.")
     if user_specified_band > number_of_bands:
         # Pluralize "band" if number_of_bands XOR 1 is true.
         sys.exit(

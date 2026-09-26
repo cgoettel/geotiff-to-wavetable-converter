@@ -28,8 +28,11 @@ def display_info(dataset: rasterio.io.DatasetReader) -> None:
     bands: int = dataset.count
     width: int = dataset.width
     height: int = dataset.height
-    info = "Bands: {}\nWidth: {}\nHeight: {}"
-    print(info.format(bands, width, height))
+    # Color interpretation per band (e.g. "red, green, blue" for a photo, "gray" for most elevation data), so
+    # users can see what -b 1/2/3 will pick.
+    colors: str = ", ".join(interp.name for interp in dataset.colorinterp)
+    info = "Bands: {} ({})\nWidth: {}\nHeight: {}"
+    print(info.format(bands, colors, width, height))
 
 
 def visualize(dataset: rasterio.io.DatasetReader) -> None:

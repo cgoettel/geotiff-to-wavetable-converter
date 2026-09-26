@@ -4,12 +4,13 @@
 
 ## Rasters to convert
 
-| Raster                                                                  | Why it's on the list                                                     |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif`           | Committed example; compare against `examples/lower-colorado.wt`          |
-| An SRTM 30m tile from [dwtkns.com/srtm30m](https://dwtkns.com/srtm30m/) | int16 source with a `-32768` nodata sentinel: exercises the float64 cast |
-| A coastal tile (ocean is nodata)                                        | Large nodata share: the mean-fill should not produce a silent table      |
-| A tile smaller than 512 rows or 4096 columns                            | Exercises upscaling instead of downscaling                               |
+| Raster                                                                  | Why it's on the list                                                             |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif`           | Committed example; compare against `examples/lower-colorado.wt`                  |
+| An SRTM 30m tile from [dwtkns.com/srtm30m](https://dwtkns.com/srtm30m/) | int16 source with a `-32768` nodata sentinel: exercises the float64 cast         |
+| A coastal tile (ocean is nodata)                                        | Large nodata share: the mean-fill should not produce a silent table              |
+| A tile smaller than 512 rows or 4096 columns                            | Exercises upscaling instead of downscaling                                       |
+| A real scan or phone photo (JPEG), with and without `-c`                | Brightness (luma) path; listen for 8-bit grit and for the orientation difference |
 
 ```bash
 geotiff-to-wavetable examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif -o /tmp/lower-colorado.wt

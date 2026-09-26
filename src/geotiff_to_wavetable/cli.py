@@ -3,9 +3,12 @@
 import argparse
 import logging
 import sys
+import warnings
 from pathlib import Path
 
+import numpy as np
 import rasterio
+from rasterio.errors import NotGeoreferencedWarning
 
 from geotiff_to_wavetable.converter import array_to_wavetable
 from geotiff_to_wavetable.io_utils import display_info, visualize, write_wt_file
@@ -49,11 +52,22 @@ def main() -> None:
     parser.add_argument(
         "-b",
         "--band",
-        default=1,
+        default=None,
         type=int,
         help=(
             "Which band you would like processed. The -i/--info option will tell you how many bands there are. "
-            "You can then use this command in conjunction with -v/--visualize to see that band displayed. Default: 1"
+            "You can then use this command in conjunction with -v/--visualize to see that band displayed. "
+            "Default: brightness (luma) for color images such as photos and scans, otherwise band 1. "
+            "On a color image, -b 1/2/3 picks the red/green/blue channel alone."
+        ),
+    )
+    parser.add_argument(
+        "-c",
+        "--columns",
+        action="store_true",
+        help=(
+            "Read the raster left to right, one column per wave frame, instead of top to bottom, one row per frame. "
+            "The same poster scanned the other way makes a different instrument."
         ),
     )
     parser.add_argument(
@@ -86,11 +100,16 @@ def main() -> None:
 
     # In order to handle the various options, we first need to read in the raster file and store that object.
     # This also means we don't have to read in the object in multiple places.
+    # Photos and scans have no map coordinates, and the conversion never uses them anyway, so rasterio's
+    # "no geotransform" warning is noise here.
+    warnings.filterwarnings("ignore", category=NotGeoreferencedWarning)
     src: rasterio.io.DatasetReader = rasterio.open(args.input_file, "r")
+    if src.crs is None:
+        logger.info(f"{args.input_file} has no georeferencing (a photo or scan?); treating it as a plain image.")
 
     # Handle each argument. argparse handles -h on its own.
     # -b, --band. If the provided band is out-of-band, print an error message and exit.
-    if args.band:
+    if args.band is not None:
         is_band_in_band(src, args.band)
     # -i, --info
     if args.info:
@@ -107,9 +126,15 @@ def main() -> None:
         visualize(src)
         sys.exit(0)
 
-    logger.info(f"Converting band {args.band} from {args.input_file} to {args.output_file}...")
+    band = "auto" if args.band is None else args.band
+    logger.info(f"Converting band {band} from {args.input_file} to {args.output_file}...")
 
     array = load_from_geotiff(src, args.band)
+    # -c, --columns. Transposing turns columns into rows, so each column becomes a wave frame. Copy to a contiguous
+    # array: the transpose is a strided view, and nodata cleaning writes into it in place.
+    if args.columns:
+        logger.info("Reading columns as wave frames (--columns).")
+        array = np.ascontiguousarray(array.T)
     try:
         samples, wave_size, wave_count = array_to_wavetable(array, nodata=src.nodata)
     except ValueError as error:
