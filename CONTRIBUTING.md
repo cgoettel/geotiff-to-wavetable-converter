@@ -72,7 +72,7 @@ Step-by-step instructions:
 > 💡 **Tips and notes**
 >
 > - Always run the commands from the project root, not src/.
-> - Prefer editable install (`pip install -e .`) for development so changes in `src/` are immediately available.
+> - `uv sync` installs the project in editable mode, so changes in `src/` are immediately available.
 > - For CI or reproducible builds, prefer explicit commands (create env, activate, install dependencies) and pin dependency versions in a lockfile or requirements file.
 
 ## Tests and pre-commit hooks
@@ -82,7 +82,7 @@ When contributing to this project, please ensure that you write tests for your c
 To run the tests or pre-commit hooks, you need to install the test dependencies and install pre-commit:
 
 ```bash
-uv pip install -e '.[test]'
+uv sync --extra test
 uv run pre-commit install
 ```
 
