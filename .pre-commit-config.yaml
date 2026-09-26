@@ -9,6 +9,9 @@ repos:
       hooks:
           - id: mypy
             args: [--strict, --ignore-missing-imports]
+            # The hook runs in an isolated env; without pytest's stubs, strict mode
+            # rejects @pytest.mark.parametrize as an untyped decorator.
+            additional_dependencies: [pytest]
     - repo: https://github.com/astral-sh/ruff-pre-commit
       rev: v0.16.7
       hooks:

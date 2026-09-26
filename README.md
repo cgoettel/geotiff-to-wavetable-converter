@@ -8,7 +8,7 @@ If you'd like to help or if you've noticed some issues, please see the [CONTRIBU
 
 ## Usage
 
-For these examples, we'll use a GeoTIFF of the Oro Valley in Arizona (`examples/USGS_1_n33w111_20240401.tif`). There's also a GeoTIFF of the lower Colorado river in there for you to check out. For more geospatial data, check out [the sources below](#finding-geospatial-data).
+For these examples, we'll use the GeoTIFF of the lower Colorado River that ships in `examples/`. For more geospatial data, check out [the sources below](#finding-geospatial-data).
 
 The tool automatically:
 
@@ -21,10 +21,10 @@ The tool automatically:
 Convert a GeoTIFF file to a wavetable:
 
 ```bash
-geotiff-to-wavetable examples/USGS_1_n33w111_20240401.tif
+geotiff-to-wavetable examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif
 ```
 
-This creates `examples/USGS_1_n33w111_20240401.wt` (in the same directory as your input file). The tool will automatically handle nodata values (like oceans or missing data) and resize your terrain to valid wavetable dimensions.
+This creates `examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.wt` (in the same directory as your input file). The tool will automatically handle nodata values (like oceans or missing data) and resize your terrain to valid wavetable dimensions.
 
 ### Options
 
@@ -37,13 +37,13 @@ geotiff-to-wavetable -h
 **Specify an output file:**
 
 ```bash
-geotiff-to-wavetable examples/USGS_1_n33w111_20240401.tif -o output.wt
+geotiff-to-wavetable examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif -o output.wt
 ```
 
 **Select a specific band** (if your GeoTIFF has multiple bands):
 
 ```bash
-geotiff-to-wavetable examples/USGS_1_n33w111_20240401.tif -b 2
+geotiff-to-wavetable examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif -b 2
 ```
 
 Most elevation data only has one band, so you won't need this option. Use `-i` to see how many bands your file has.
@@ -51,7 +51,7 @@ Most elevation data only has one band, so you won't need this option. Use `-i` t
 **View file information** (bands, width, height):
 
 ```bash
-geotiff-to-wavetable examples/USGS_1_n33w111_20240401.tif -i
+geotiff-to-wavetable examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif -i
 ```
 
 **Visualize the data** before converting:
@@ -59,13 +59,13 @@ geotiff-to-wavetable examples/USGS_1_n33w111_20240401.tif -i
 View the default band:
 
 ```bash
-geotiff-to-wavetable examples/USGS_1_n33w111_20240401.tif -v
+geotiff-to-wavetable examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif -v
 ```
 
 View a specific band:
 
 ```bash
-geotiff-to-wavetable examples/USGS_1_n33w111_20240401.tif -b 2 -v
+geotiff-to-wavetable examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif -b 2 -v
 ```
 
 This opens a plot showing your elevation data. It's a helpful first step to make sure Python can read your file and that it contains the terrain you expect. If it doesn't look right, make sure to check how many bands there are (`-i`) and then view the other bands.

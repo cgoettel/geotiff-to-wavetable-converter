@@ -1,8 +1,8 @@
 """Smoke tests for cli.py.
 
 Kept deliberately minimal: assert the module imports cleanly and argparse
-wires up (a --help invocation exits with code 0). End-to-end CLI behavior is
-covered transitively by the unit tests in test_converter.py / test_validators.py.
+wires up (a --help invocation exits with code 0). End-to-end CLI behavior lives
+in test_integration.py.
 """
 
 from pathlib import Path
