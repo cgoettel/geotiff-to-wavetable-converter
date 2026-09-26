@@ -304,3 +304,25 @@ def test_all_nodata_exits_with_error(tmp_path: Path) -> None:
     assert "only nodata/NaN values" in result.stderr
     assert "Traceback" not in result.stderr
     assert not (tmp_path / "out.wt").exists()
+
+
+@pytest.mark.parametrize(
+    "flat",
+    [
+        np.full((8, 16), 350.0, dtype=np.float32),  # a lakebed: one elevation everywhere
+        np.where(np.eye(8, 16, dtype=bool), NODATA, 350.0).astype(np.float32),  # flat once nodata is mean-filled
+    ],
+    ids=["constant", "constant-with-nodata"],
+)
+def test_flat_raster_exits_with_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, flat: npt.NDArray[np.float32]
+) -> None:
+    """A flat band would normalize to silence, so the CLI refuses instead of writing it."""
+    source = write_geotiff(tmp_path / "flat.tif", flat)
+
+    with pytest.raises(SystemExit) as exc_info:
+        run_cli(monkeypatch, tmp_path, str(source), "-o", "out.wt")
+
+    assert isinstance(exc_info.value.code, str)
+    assert exc_info.value.code.startswith("ERROR: The selected band is flat")
+    assert not (tmp_path / "out.wt").exists()

@@ -144,6 +144,14 @@ def test_normalize_to_int16_preserves_shape() -> None:
     assert result.dtype == np.int16
 
 
+def test_normalize_to_int16_flat_raises(caplog: pytest.LogCaptureFixture) -> None:
+    """A flat array can't be rescaled (0/0) — refuse rather than emit a silent all-zero table."""
+    bands = np.full((4, 8), 100.0)
+    with caplog.at_level(logging.ERROR, logger=LOGGER_NAME), pytest.raises(ValueError, match="flat"):
+        _normalize_to_int16(bands)
+    assert any("flat" in record.getMessage() for record in caplog.records)
+
+
 # --- array_to_wavetable (1.0.0 public API contract) --------------------------
 
 
