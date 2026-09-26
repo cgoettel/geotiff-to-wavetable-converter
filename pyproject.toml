@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "geotiff-to-wavetable"
-version = "0.2.0"
+version = "0.3.0"
 description = "Convert GeoTIFF elevation data to wavetable files for synthesizers"
 readme = "README.md"
 requires-python = ">=3.10"
