@@ -6,6 +6,7 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 
 ### Changed
 
+- Depend on `opencv-python-headless` instead of `opencv-python`. The converter only uses OpenCV to resize arrays, never its windows, so the headless build is a smaller install and needs no system graphics libraries (it now installs cleanly on servers and slim containers). If you installed `opencv-python` separately, both can coexist.
 - Package metadata declares its license as the SPDX expression `MIT` ([PEP 639](https://peps.python.org/pep-0639/)) and bundles `LICENSE`, replacing the deprecated table form and trove classifier that setuptools will stop accepting.
 
 ## [0.3.0] - 2026-09-26

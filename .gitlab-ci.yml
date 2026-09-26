@@ -36,8 +36,9 @@ publish_to_pypi:
     PYPI_ID_TOKEN:
       aud: pypi
   before_script:
-    # opencv-python needs these shared libraries to import, even headless.
-    - apt-get update -qq && apt-get install -y -qq --no-install-recommends libgl1 libglib2.0-0 > /dev/null
+    # rasterio's wheel links against the system libexpat, which the slim image lacks. (OpenCV needs nothing: the
+    # headless build bundles its libraries, unlike opencv-python, which needed libgl1 and libglib2.0-0 here.)
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends libexpat1 > /dev/null
   script:
     # The tag must match the version being built, or PyPI would get a mislabeled release.
     - test "v$(uv version --short)" = "$CI_COMMIT_TAG" || { echo "Tag $CI_COMMIT_TAG does not match pyproject version $(uv version --short)"; exit 1; }
