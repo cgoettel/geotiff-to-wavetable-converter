@@ -2,6 +2,12 @@
 
 All notable changes to this project. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- Package metadata declares its license as the SPDX expression `MIT` ([PEP 639](https://peps.python.org/pep-0639/)) and bundles `LICENSE`, replacing the deprecated table form and trove classifier that setuptools will stop accepting.
+
 ## [0.3.0] - 2026-09-26
 
 ### Added
