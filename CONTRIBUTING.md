@@ -104,6 +104,10 @@ This project uses pre-commit to enforce code style and quality. You can run the 
 uv run pre-commit run --all-files
 ```
 
+### Continuous integration
+
+Every merge request and every push to `main` runs the `test` job in GitLab CI: the tests, then the same pre-commit hooks with `--all-files`. It runs the hooks rather than the ruff and mypy versions in `uv.lock`, so CI checks exactly what a local commit does. If the hooks pass locally, the job should too.
+
 ## Building and uploading to PyPi
 
 ### Building the package

@@ -2,7 +2,8 @@
 # mixed-line-ending, check-merge-conflict), markdown formatting, secret scanning,
 # and conventional commit-msg linting now live in the fleet-wide global pre-commit
 # hygiene tier (~/.config/pre-commit/global.yaml, run via core.hooksPath). This
-# config keeps only the language-specific toolchain, which CI also mirrors.
+# config keeps only the language-specific toolchain, which the CI test job runs
+# on every merge request and push to main.
 repos:
     - repo: https://github.com/pre-commit/mirrors-mypy
       rev: v2.3.1
