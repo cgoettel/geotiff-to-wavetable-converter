@@ -2,6 +2,12 @@
 
 All notable changes to this project. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- `examples/lower-colorado-lcr-000002.laz`: the LiDAR point cloud behind the example GeoTIFF, covering the same ground at full density (2.05 million points, ground and unclassified returns). It's cropped from the public-domain [USGS 3DEP copy on AWS](https://registry.opendata.aws/usgs-lidar/), stored in Web Mercator (EPSG:3857), and waiting on LiDAR input support (#19).
+
 ## [0.3.1] - 2026-09-26
 
 ### Changed
