@@ -11,6 +11,7 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 ### Changed
 
 - GitLab CI runs the tests and the pre-commit hooks (ruff, mypy) on every merge request and every push to `main`. Before, the tests only ran in CI when a release tag published to PyPI.
+- CI jobs retry up to twice when the runner itself fails, such as when GitHub's container registry rate-limits the image pull. A failing test still fails the first time.
 
 ## [0.3.1] - 2026-09-26
 

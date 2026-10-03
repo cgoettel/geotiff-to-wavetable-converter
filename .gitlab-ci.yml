@@ -23,6 +23,11 @@ workflow:
   # Python 3.13, not 3.14: uv.lock pins numpy 2.2.6 (the last release supporting Python 3.10), which ships
   # no 3.14 wheels, and this slim image has no compiler to build it from source.
   image: ghcr.io/astral-sh/uv:0.12.19-python3.13-trixie-slim
+  # ghcr.io rate-limits image pulls across GitLab's shared runners. Retry those infrastructure failures, never a
+  # failing script: GitLab reports a failed test as script_failure, which this doesn't match.
+  retry:
+    max: 2
+    when: [runner_system_failure]
   before_script:
     # rasterio's wheel links against the system libexpat, which the slim image lacks. (OpenCV needs nothing: the
     # headless build bundles its libraries, unlike opencv-python, which needed libgl1 and libglib2.0-0 here.)
