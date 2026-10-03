@@ -6,7 +6,7 @@
 # on every merge request and push to main.
 repos:
     - repo: https://github.com/pre-commit/mirrors-mypy
-      rev: v2.3.1
+      rev: v2.4.0
       hooks:
           - id: mypy
             args: [--strict, --ignore-missing-imports]
