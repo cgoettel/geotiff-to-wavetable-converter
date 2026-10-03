@@ -2,7 +2,7 @@
 
 This is a utility to convert GeoTIFF files to wavetable files (`.wt`) for use in synthesizers.
 
-Despite the name, GeoTIFFs aren't the only way in: photos and scans (JPEG, PNG, WebP, and more) work too. Scan a poster, a wall, or a texture and play it. See [Images and scans](#images-and-scans).
+Despite the name, GeoTIFFs aren't the only way in: photos and scans (JPEG, PNG, WebP, and more) work too. Scan a poster, a wall, or a texture and play it. See [Images and scans](#images-and-scans). LiDAR point clouds (`.las`, `.laz`) work as well. See [LiDAR point clouds](#lidar-point-clouds).
 
 I've never worked with GeoTIFF and my wavetable experience is limited. Huge shout-out to both [`okwt`](https://github.com/drzhnn/okwt/tree/main) and [`surge`](https://github.com/surge-synthesizer/surge/tree/main) for their helpful implementations.
 
@@ -113,6 +113,21 @@ Scanning tips:
 - **Bit depth:** photos are usually 8-bit, which gives 256 brightness levels. That sounds a little stepped and gritty, which may be exactly what you want. For smoother tables, have the scanner save 16-bit TIFF.
 - **Formats the tool can't read:** iPhone HEIC photos and PDFs from scanner apps need converting first, e.g. `magick scan.heic scan.png` ([ImageMagick](https://imagemagick.org/)).
 
+### LiDAR point clouds
+
+LAS and LAZ files, the raw laser returns behind most high-resolution elevation models, convert directly. `examples/` has the point cloud behind the example GeoTIFF:
+
+```bash
+geotiff-to-wavetable examples/lower-colorado-lcr-000002.laz
+```
+
+How point clouds are read:
+
+- **Ground points only.** Points classified as ground (class 2) are kept, and trees, buildings, and noise are dropped. On the example, this matches the GeoTIFF to within a centimeter.
+- **Gridded by density.** Points are binned onto a square grid with cells three times the average point spacing (about 1.2 m on the example), and each cell takes the mean elevation of its points. Row 0 is north and column 0 is west, the same as a GeoTIFF.
+- **Gaps are filled.** Cells with no ground point, mostly water (which returns little of the laser), get the mean elevation, like nodata in a GeoTIFF. About 15% of the example is river.
+- **`-i` lists the classes.** It prints the point count and how many points are in each class, for example `Class 2 (ground): 1098401`. `-v` shows the grid the wavetable will be made from. `-b` doesn't apply, since point clouds have no bands.
+
 ### Importing into Bitwig
 
 Bitwig expects files to be in `~/Documents/Bitwig Studio/Library`, so copy your file into that directory and then you can source it from Bitwig's wavetable.
@@ -167,7 +182,7 @@ Where to get elevation data, in the order to try them:
 
 1. Go to [their site](https://apps.nationalmap.gov/downloader/)
 2. Zoom in on an area or search (upper right of the map). I have found that larger areas work better for finding results and then you can scroll through until you see something interesting.
-3. On the left, you should be in the Datasets tab. Select "Elevation Source Data (3DEP) - Lidar, IfSAR". Within that, you can select File Formats "TIFF" (I want to add LiDAR support in a future update)
+3. On the left, you should be in the Datasets tab. Select "Elevation Source Data (3DEP) - Lidar, IfSAR". Within that, you can select File Formats "TIFF", or the LAS/LAZ format for the raw point clouds (see [LiDAR point clouds](#lidar-point-clouds)).
 4. You might need to scroll up. Click the "🔍 Search Products" button. This will bring you to the Products tab.
 5. You can now scroll through the available images. If nothing returns, try increasing your area. For example, I couldn't find anything for Kauai. I zoomed out and couldn't find anything for the Hawaiian Islands. So I zoomed out and got stuff for the Aleutian Islands ([copyright is commercial for Alaska](https://www.usgs.gov/faqs/are-usgs-topographic-maps-copyrighted) which is why we're using Arizona for our `examples/`).
 6. Find something that looks interesting and click the "Download Link (TIF)" link (it might be "Download Link (ZIP)" and then you'll need to unzip and might have multiple TIFs to play around with).
