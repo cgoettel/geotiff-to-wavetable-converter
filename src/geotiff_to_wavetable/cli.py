@@ -7,13 +7,21 @@ import warnings
 from collections.abc import Callable
 from pathlib import Path
 
+import laspy
 import numpy as np
+import numpy.typing as npt
 import rasterio
 from rasterio.errors import NotGeoreferencedWarning
 
 from geotiff_to_wavetable.converter import array_to_wavetable
-from geotiff_to_wavetable.io_utils import display_info, visualize, write_wav_file, write_wt_file
-from geotiff_to_wavetable.loaders import load_from_geotiff
+from geotiff_to_wavetable.io_utils import (
+    display_info,
+    display_point_cloud_info,
+    visualize,
+    write_wav_file,
+    write_wt_file,
+)
+from geotiff_to_wavetable.loaders import LIDAR_NODATA, load_from_geotiff, load_from_lidar
 from geotiff_to_wavetable.validators import is_band_in_band, validate_wave_size
 
 # Set up logger
@@ -63,6 +71,63 @@ def output_paths(input_file: str, output_file: str | None, formats: tuple[str, .
     return {fmt: str(Path(output_file).with_suffix(f".{fmt}")) for fmt in formats}
 
 
+POINT_CLOUD_SUFFIXES = (".las", ".laz")
+
+
+def is_point_cloud(input_file: str) -> bool:
+    """True for LAS/LAZ LiDAR files, which load through laspy instead of rasterio."""
+    return Path(input_file).suffix.lower() in POINT_CLOUD_SUFFIXES
+
+
+def read_raster(args: argparse.Namespace) -> tuple[npt.NDArray[np.float64], float | None]:
+    """Open a raster, handle the raster-only options (-b, -i, -v), and return its array and nodata value."""
+    # Photos and scans have no map coordinates, and the conversion never uses them anyway, so rasterio's
+    # "no geotransform" warning is noise here.
+    warnings.filterwarnings("ignore", category=NotGeoreferencedWarning)
+    src: rasterio.io.DatasetReader = rasterio.open(args.input_file, "r")
+    if src.crs is None:
+        logger.info(f"{args.input_file} has no georeferencing (a photo or scan?); treating it as a plain image.")
+
+    # -b, --band. If the provided band is out-of-band, print an error message and exit.
+    if args.band is not None:
+        is_band_in_band(src, args.band)
+    # -i, --info
+    if args.info:
+        display_info(src)
+        sys.exit(0)
+    # -v, --visualize
+    if args.visualize:
+        visualize(src)
+        sys.exit(0)
+
+    band = "auto" if args.band is None else args.band
+    logger.info(f"Converting band {band} from {args.input_file}...")
+    nodata: float | None = src.nodata
+    return load_from_geotiff(src, args.band), nodata
+
+
+def read_point_cloud(args: argparse.Namespace) -> tuple[npt.NDArray[np.float64], float | None]:
+    """Read a LAS/LAZ point cloud, handle -i and -v, and return its ground points rasterized, with their nodata."""
+    if args.band is not None:
+        sys.exit("ERROR: -b/--band picks a raster band; point clouds have none.")
+    points = laspy.read(args.input_file)
+    # -i, --info
+    if args.info:
+        display_point_cloud_info(points)
+        sys.exit(0)
+
+    logger.info(f"Converting ground points from {args.input_file}...")
+    try:
+        array = load_from_lidar(points)
+    except ValueError as error:
+        sys.exit(f"ERROR: {error}")
+    # -v, --visualize. Shows the rasterized grid, which is what the wavetable is made from.
+    if args.visualize:
+        visualize(array)
+        sys.exit(0)
+    return array, LIDAR_NODATA
+
+
 def main() -> None:
     """Parses the command-line arguments and runs the desired commands."""
     # Set up logging.
@@ -83,13 +148,16 @@ def main() -> None:
     )
 
     # Instantiate argument parser
-    parser = argparse.ArgumentParser(description="Converts rasters to a wavetable.")
+    parser = argparse.ArgumentParser(description="Converts rasters and LiDAR point clouds to a wavetable.")
 
     # Required arguments
     parser.add_argument(
         "input_file",  # Works with relative and absolute paths.
         type=str,
-        help="The filename (relative or absolute) to the raster file.",
+        help=(
+            "The filename (relative or absolute) to the raster file, or a LAS/LAZ LiDAR point cloud (.las, .laz), "
+            "whose ground points are gridded into an elevation model first."
+        ),
     )
 
     # Optional arguments
@@ -166,40 +234,23 @@ def main() -> None:
     # Parse arguments
     args: argparse.Namespace = parser.parse_args()
 
-    # In order to handle the various options, we first need to read in the raster file and store that object.
-    # This also means we don't have to read in the object in multiple places.
-    # Photos and scans have no map coordinates, and the conversion never uses them anyway, so rasterio's
-    # "no geotransform" warning is noise here.
-    warnings.filterwarnings("ignore", category=NotGeoreferencedWarning)
-    src: rasterio.io.DatasetReader = rasterio.open(args.input_file, "r")
-    if src.crs is None:
-        logger.info(f"{args.input_file} has no georeferencing (a photo or scan?); treating it as a plain image.")
+    # Read the input once, handling the options that stop before converting (-i, -v). argparse handles -h on its own.
+    if is_point_cloud(args.input_file):
+        array, nodata = read_point_cloud(args)
+    else:
+        array, nodata = read_raster(args)
 
-    # Handle each argument. argparse handles -h on its own.
-    # -b, --band. If the provided band is out-of-band, print an error message and exit.
-    if args.band is not None:
-        is_band_in_band(src, args.band)
-    # -i, --info
-    if args.info:
-        display_info(src)
-        sys.exit(0)
     # -o, --output-file and -f, --format: one output path per requested format (see output_paths).
     outputs = output_paths(args.input_file, args.output_file, args.format)
-    if args.visualize:
-        visualize(src)
-        sys.exit(0)
+    logger.info(f"Writing {', '.join(outputs.values())}.")
 
-    band = "auto" if args.band is None else args.band
-    logger.info(f"Converting band {band} from {args.input_file} to {', '.join(outputs.values())}...")
-
-    array = load_from_geotiff(src, args.band)
     # -c, --columns. Transposing turns columns into rows, so each column becomes a wave frame. Copy to a contiguous
     # array: the transpose is a strided view, and nodata cleaning writes into it in place.
     if args.columns:
         logger.info("Reading columns as wave frames (--columns).")
         array = np.ascontiguousarray(array.T)
     try:
-        samples, wave_size, wave_count = array_to_wavetable(array, nodata=src.nodata, wave_size=args.wave_size)
+        samples, wave_size, wave_count = array_to_wavetable(array, nodata=nodata, wave_size=args.wave_size)
     except ValueError as error:
         # Unusable input (e.g. an all-nodata band): exit with the message instead of a traceback, matching the
         # other CLI errors.

@@ -4,6 +4,9 @@ import logging
 import sys
 import wave
 
+import laspy
+import numpy as np
+import numpy.typing as npt
 import rasterio
 import rasterio.plot
 
@@ -36,14 +39,49 @@ def display_info(dataset: rasterio.io.DatasetReader) -> None:
     print(info.format(bands, colors, width, height))
 
 
-def visualize(dataset: rasterio.io.DatasetReader) -> None:
+def display_point_cloud_info(points: laspy.LasData) -> None:
+    """Displays information about a LAS/LAZ point cloud: its size and how many points each class has.
+
+    The class counts show what's in the file before converting. Only ground points (class 2) are used.
+
+    Args:
+        points: The LasData object created with laspy.read()
+
+    Returns:
+        None
+    """
+    header = points.header
+    classes, counts = np.unique(np.asarray(points.classification), return_counts=True)
+    print(f"Points: {header.point_count} (LAS {header.version}, point format {header.point_format.id})")
+    for code, count in zip(classes.tolist(), counts.tolist(), strict=True):
+        name = ASPRS_CLASSES.get(code, "other")
+        print(f"Class {code} ({name}): {count}")
+
+
+# The ASPRS classes USGS 3DEP point clouds commonly use (LAS 1.4 specification, table 17).
+ASPRS_CLASSES = {
+    0: "never classified",
+    1: "unclassified",
+    2: "ground",
+    3: "low vegetation",
+    4: "medium vegetation",
+    5: "high vegetation",
+    6: "building",
+    7: "low noise",
+    9: "water",
+    17: "bridge deck",
+    18: "high noise",
+}
+
+
+def visualize(dataset: rasterio.io.DatasetReader | npt.NDArray[np.float64]) -> None:
     """Plots the provided object.
 
     This is a helpful debugging step that allows you to provide a file and see it plotted.
     It's a good first step in checking your data — not just that it's valid, but that Python can read it.
 
     Args:
-        dataset: The DatasetReader object created with rasterio.open()
+        dataset: The DatasetReader object created with rasterio.open(), or a 2D array (a rasterized point cloud)
 
     Returns:
         None

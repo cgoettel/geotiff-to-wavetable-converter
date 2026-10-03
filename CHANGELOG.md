@@ -6,7 +6,8 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 
 ### Added
 
-- `examples/lower-colorado-lcr-000002.laz`: the LiDAR point cloud behind the example GeoTIFF, covering the same ground at full density (2.05 million points, ground and unclassified returns). It's cropped from the public-domain [USGS 3DEP copy on AWS](https://registry.opendata.aws/usgs-lidar/), stored in Web Mercator (EPSG:3857), and waiting on LiDAR input support (#19).
+- **LiDAR point clouds.** LAS and LAZ files convert directly. Ground points (class 2) are binned onto a grid with cells three times the average point spacing, each cell takes their mean elevation, and empty cells (mostly water) are filled like nodata. On the example, the result matches the GeoTIFF to a median of 9 mm. `-i` lists the point count per class, and `-v` shows the grid. `load_from_lidar` is the library entry point, and takes `classes` and `cell_size` arguments (#19).
+- `examples/lower-colorado-lcr-000002.laz`: the LiDAR point cloud behind the example GeoTIFF, covering the same ground at full density (2.05 million points, ground and unclassified returns). It's cropped from the public-domain [USGS 3DEP copy on AWS](https://registry.opendata.aws/usgs-lidar/) and stored in Web Mercator (EPSG:3857).
 
 ### Changed
 

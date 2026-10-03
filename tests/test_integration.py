@@ -17,6 +17,7 @@ import wave
 from dataclasses import dataclass
 from pathlib import Path
 
+import laspy
 import numpy as np
 import numpy.typing as npt
 import pytest
@@ -572,3 +573,85 @@ def test_unknown_format_is_a_usage_error(
 
     assert exc_info.value.code == 2
     assert "-f/--format" in capsys.readouterr().err
+
+
+# --- LiDAR point clouds ------------------------------------------------------------------------
+
+
+def write_point_cloud(path: Path, classification: int = 2) -> Path:
+    """Write a 40x40 lattice of points (a tilted plane with a ripple) as a LAS or LAZ, by suffix."""
+    lattice = np.arange(40, dtype=np.float64)
+    x, y = np.meshgrid(lattice, lattice)
+    points = laspy.LasData(laspy.LasHeader(point_format=6, version="1.4"))
+    points.header.scales = np.array([0.01, 0.01, 0.01])
+    points.x = x.ravel()
+    points.y = y.ravel()
+    points.z = (x + 5 * np.sin(y / 4)).ravel()
+    points.classification = np.full(x.size, classification, dtype=np.uint8)
+    points.write(path)
+    return path
+
+
+@pytest.mark.parametrize("suffix", [".las", ".laz", ".LAZ"])
+def test_point_cloud_converts_to_wavetable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, suffix: str) -> None:
+    """A LAS/LAZ input is gridded and converted: 40 points across at 3x spacing is a 14x14 grid."""
+    source = write_point_cloud(tmp_path / f"terrain{suffix}")
+
+    run_cli(monkeypatch, tmp_path, str(source))
+
+    wavetable = read_wt(source.with_suffix(".wt"))
+    assert_valid_wavetable(wavetable)
+    assert (wavetable.wave_size, wavetable.wave_count) == (16, 14)
+
+
+def test_point_cloud_info_lists_classes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """-i on a point cloud prints its size and per-class point counts, and writes nothing."""
+    source = write_point_cloud(tmp_path / "terrain.laz")
+
+    with pytest.raises(SystemExit) as exc_info:
+        run_cli(monkeypatch, tmp_path, str(source), "-i")
+
+    assert exc_info.value.code == 0
+    assert capsys.readouterr().out.splitlines() == [
+        "Points: 1600 (LAS 1.4, point format 6)",
+        "Class 2 (ground): 1600",
+    ]
+    assert not list(tmp_path.glob("*.wt"))
+
+
+def test_point_cloud_visualize_shows_the_grid(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """-v on a point cloud plots the rasterized grid the wavetable would be made from."""
+    source = write_point_cloud(tmp_path / "terrain.las")
+    shown: list[object] = []
+    monkeypatch.setattr("rasterio.plot.show", shown.append)
+
+    with pytest.raises(SystemExit) as exc_info:
+        run_cli(monkeypatch, tmp_path, str(source), "-v")
+
+    assert exc_info.value.code == 0
+    assert len(shown) == 1
+    assert isinstance(shown[0], np.ndarray)
+    assert shown[0].shape == (14, 14)
+    assert not list(tmp_path.glob("*.wt"))
+
+
+def test_point_cloud_rejects_band_option(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """-b means nothing for a point cloud, so it's an error rather than silently ignored."""
+    source = write_point_cloud(tmp_path / "terrain.las")
+
+    with pytest.raises(SystemExit) as exc_info:
+        run_cli(monkeypatch, tmp_path, str(source), "-b", "1")
+
+    assert exc_info.value.code == "ERROR: -b/--band picks a raster band; point clouds have none."
+
+
+def test_point_cloud_without_ground_exits_with_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A cloud with no ground points exits with a message instead of a traceback."""
+    source = write_point_cloud(tmp_path / "canopy.las", classification=5)
+
+    with pytest.raises(SystemExit) as exc_info:
+        run_cli(monkeypatch, tmp_path, str(source))
+
+    assert exc_info.value.code == "ERROR: The point cloud has no points classified as [2]."
