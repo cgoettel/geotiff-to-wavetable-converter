@@ -8,6 +8,10 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 
 - `examples/lower-colorado-lcr-000002.laz`: the LiDAR point cloud behind the example GeoTIFF, covering the same ground at full density (2.05 million points, ground and unclassified returns). It's cropped from the public-domain [USGS 3DEP copy on AWS](https://registry.opendata.aws/usgs-lidar/), stored in Web Mercator (EPSG:3857), and waiting on LiDAR input support (#19).
 
+### Changed
+
+- GitLab CI runs the tests and the pre-commit hooks (ruff, mypy) on every merge request and every push to `main`. Before, the tests only ran in CI when a release tag published to PyPI.
+
 ## [0.3.1] - 2026-09-26
 
 ### Changed

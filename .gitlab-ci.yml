@@ -6,6 +6,49 @@
 # No stored secret: PyPI trusts this project's GitLab CI via a trusted publisher
 # (pypi.org → geotiff-to-wavetable → Settings → Publishing), so the job trades
 # GitLab's short-lived identity token for a short-lived PyPI upload token.
+#
+# test: every merge request and every push to main runs the tests and the pre-commit hooks (ruff, mypy).
+
+# Pipelines run for merge requests, main, and version tags. A branch with an open merge request
+# gets only the merge request pipeline, not a second branch pipeline.
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+.uv_python:
+  # Python 3.13, not 3.14: uv.lock pins numpy 2.2.6 (the last release supporting Python 3.10), which ships
+  # no 3.14 wheels, and this slim image has no compiler to build it from source.
+  image: ghcr.io/astral-sh/uv:0.12.19-python3.13-trixie-slim
+  before_script:
+    # rasterio's wheel links against the system libexpat, which the slim image lacks. (OpenCV needs nothing: the
+    # headless build bundles its libraries, unlike opencv-python, which needed libgl1 and libglib2.0-0 here.)
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends libexpat1 > /dev/null
+
+test:
+  extends: .uv_python
+  variables:
+    UV_CACHE_DIR: $CI_PROJECT_DIR/.cache/uv
+    PRE_COMMIT_HOME: $CI_PROJECT_DIR/.cache/pre-commit
+  cache:
+    key:
+      files: [uv.lock, .pre-commit-config.yaml]
+    paths: [.cache/uv, .cache/pre-commit]
+  before_script:
+    - !reference [.uv_python, before_script]
+    # pre-commit lists files and fetches hook repositories with git, which the slim image also lacks.
+    - apt-get install -y -qq --no-install-recommends git ca-certificates > /dev/null
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+  script:
+    - uv run --extra test pytest -q
+    # The hooks themselves, not the locked ruff and mypy, so CI checks exactly what a local commit does.
+    - uv run --extra test pre-commit run --all-files --show-diff-on-failure
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
 
 mirror_to_github:
   image:
@@ -27,18 +70,12 @@ mirror_to_github:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
 
 publish_to_pypi:
-  # Python 3.13, not 3.14: uv.lock pins numpy 2.2.6 (the last release supporting Python 3.10), which ships
-  # no 3.14 wheels, and this slim image has no compiler to build it from source.
-  image: ghcr.io/astral-sh/uv:0.12.19-python3.13-trixie-slim
+  extends: .uv_python
   # The trusted publisher on PyPI is scoped to this environment name.
   environment: pypi
   id_tokens:
     PYPI_ID_TOKEN:
       aud: pypi
-  before_script:
-    # rasterio's wheel links against the system libexpat, which the slim image lacks. (OpenCV needs nothing: the
-    # headless build bundles its libraries, unlike opencv-python, which needed libgl1 and libglib2.0-0 here.)
-    - apt-get update -qq && apt-get install -y -qq --no-install-recommends libexpat1 > /dev/null
   script:
     # The tag must match the version being built, or PyPI would get a mislabeled release.
     - test "v$(uv version --short)" = "$CI_COMMIT_TAG" || { echo "Tag $CI_COMMIT_TAG does not match pyproject version $(uv version --short)"; exit 1; }
