@@ -6,7 +6,15 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 
 ### Added
 
+- `--surface clipped`: `canopy` with its tallest 10% cut flat, so a few big trees can't take the whole range (#32).
+- `--surface capped`: the ground's shape, with each tree or building's height above it capped at the 90th percentile of those heights, so hilltops survive (#32).
+- `--surface all` writes every surface to its own file, lettered so they sort together and in order: `river-a-ground.wt` through `river-e-capped.wt`. A surface that comes out flat is skipped with a warning.
+- `load_lidar_surface(points, surface)` makes any surface from the library, and `SURFACES` lists them.
 - `examples/portland-downtown.laz` and `examples/portland-downtown.tif`: a 250 m square of downtown Portland, Oregon at the foot of the West Hills, as a LiDAR point cloud (1.54 million points, 2019) and the matching USGS 1 m elevation model. The ground slopes only 14 m, but the towers rise up to 132 m above it. A city is built on a boring plot of land, and its buildings make the sound interesting. Public domain, cropped from the [USGS 3DEP copies on AWS](https://registry.opendata.aws/usgs-lidar/).
+
+### Fixed
+
+- LiDAR noise (classes 7 and 18: stray returns from birds, haze, and the sensor) is left out of every surface. In 0.5.0, `--surface blended` and `canopy` kept it, so one high-noise return far above the tallest building could set the top of the range. Downtown Portland has 699 of them, reaching 195 m.
 
 ## [0.5.0] - 2026-10-04
 

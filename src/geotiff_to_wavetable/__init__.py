@@ -16,8 +16,10 @@ from geotiff_to_wavetable.io_utils import (
 )
 from geotiff_to_wavetable.loaders import (
     LIDAR_NODATA,
+    SURFACES,
     load_from_geotiff,
     load_from_lidar,
+    load_lidar_surface,
 )
 from geotiff_to_wavetable.validators import (
     is_band_in_band,
@@ -28,6 +30,7 @@ __version__ = version("geotiff-to-wavetable")
 
 __all__ = [
     "LIDAR_NODATA",
+    "SURFACES",
     "array_to_wavetable",
     "calculate_height",
     "calculate_width",
@@ -36,6 +39,7 @@ __all__ = [
     "is_band_in_band",
     "load_from_geotiff",
     "load_from_lidar",
+    "load_lidar_surface",
     "validate_wave_size",
     "visualize",
     "write_wav_file",

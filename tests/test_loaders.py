@@ -22,7 +22,7 @@ import pytest
 import rasterio
 from rasterio.io import MemoryFile
 
-from geotiff_to_wavetable.loaders import GROUND, LUMA_WEIGHTS, load_from_geotiff, load_from_lidar
+from geotiff_to_wavetable.loaders import GROUND, LUMA_WEIGHTS, load_from_geotiff, load_from_lidar, load_lidar_surface
 
 
 @contextmanager
@@ -270,3 +270,104 @@ def test_load_from_lidar_rejects_an_unknown_cell_value(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="Cell value must be one of mean, highest"):
         load_from_lidar(points, cell_value="median")  # type: ignore[arg-type]
+
+
+# --- load_lidar_surface -------------------------------------------------------------------------
+
+
+def hillside(path: Path) -> laspy.LasData:
+    """Ground rising 10 m per cell from west to east, with a tree on each of the first nine cells and a 50 m one last.
+
+    Ten 1 m cells in a row. Ground at x+0.5 sits at 10*x; trees (class 5) stand 5 m tall over cells 0-8 and 50 m over
+    cell 9. A single high-noise return (class 18) floats 500 m up over cell 0. Two more ground points, at x=0 and
+    x=10, pin the extent to exactly ten cells.
+    """
+    cells = np.arange(10, dtype=np.float64)
+    ground_x, ground_z = cells + 0.5, 10 * cells
+    tree_x = cells + 0.5
+    tree_z = ground_z + np.where(cells == 9, 50.0, 5.0)
+    return write_las(
+        path,
+        x=[0.0, *ground_x, *tree_x, 0.5, 10.0],
+        y=[0.0] * 23,
+        z=[0.0, *ground_z, *tree_z, 500.0, 90.0],
+        classification=[GROUND, *[GROUND] * 10, *[5] * 10, 18, GROUND],
+    )
+
+
+def test_surfaces_drop_noise(tmp_path: Path) -> None:
+    """A high-noise return 500 m up never becomes the canopy."""
+    points = hillside(tmp_path / "fixture.las")
+
+    canopy = load_lidar_surface(points, "canopy", cell_size=1.0)
+
+    assert np.nanmax(canopy) == 140.0  # the 50 m tree on the 90 m ground, not the 500 m noise
+    assert canopy[0, 0] == 5.0
+
+
+def test_clipped_cuts_the_canopy_at_its_90th_percentile(tmp_path: Path) -> None:
+    """The clipped surface flattens the top 10% of canopy elevations, whatever they are: here, the tall tree."""
+    points = hillside(tmp_path / "fixture.las")
+    canopy = load_lidar_surface(points, "canopy", cell_size=1.0)
+
+    clipped = load_lidar_surface(points, "clipped", cell_size=1.0)
+
+    ceiling = np.nanpercentile(canopy, 90)
+    np.testing.assert_array_equal(clipped, np.minimum(canopy, ceiling))
+    assert np.nanmax(clipped) < 140.0
+
+
+def test_capped_keeps_the_hill_and_reins_in_the_tall_tree(tmp_path: Path) -> None:
+    """The capped surface keeps every cell's ground and caps only the height above it, so the hilltop survives."""
+    points = hillside(tmp_path / "fixture.las")
+
+    capped = load_lidar_surface(points, "capped", cell_size=1.0)
+
+    ground = 10 * np.arange(10, dtype=np.float64)
+    heights = np.array([5.0] * 9 + [50.0])
+    cap = np.percentile(heights, 90)  # 9.5 m: the 50 m tree is cut down, the 5 m ones are untouched
+    np.testing.assert_allclose(capped[0], ground + np.minimum(heights, cap))
+
+
+def test_blended_and_ground_surfaces_match_load_from_lidar(tmp_path: Path) -> None:
+    """The ground surface is load_from_lidar's default; blended is every class but noise, averaged."""
+    points = hillside(tmp_path / "fixture.las")
+
+    np.testing.assert_array_equal(
+        load_lidar_surface(points, "ground", cell_size=1.0), load_from_lidar(points, cell_size=1.0)
+    )
+    np.testing.assert_array_equal(
+        load_lidar_surface(points, "blended", cell_size=1.0),
+        load_from_lidar(points, classes=[GROUND, 5], cell_size=1.0),
+    )
+
+
+def test_surfaces_refuse_what_they_cannot_make(tmp_path: Path) -> None:
+    """An unknown surface, a cloud of nothing but noise, and capped without ground points all fail loudly."""
+    noise_only = write_las(tmp_path / "noise.las", x=[0.0], y=[0.0], z=[1.0], classification=[18])
+    trees_only = write_las(tmp_path / "trees.las", x=[0.0, 1.0], y=[0.0, 0.0], z=[1.0, 2.0], classification=[5, 5])
+
+    with pytest.raises(ValueError, match="Surface must be one of"):
+        load_lidar_surface(trees_only, "forest")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="only noise"):
+        load_lidar_surface(noise_only, "canopy")
+    with pytest.raises(ValueError, match=r"no points classified as \[2\]"):
+        load_lidar_surface(trees_only, "capped")
+
+
+def test_capped_interpolates_the_ground_under_buildings(tmp_path: Path) -> None:
+    """A roof hides the ground, so capped fills the ground in from its neighbors instead of dropping the building."""
+    building = 6
+    # Five 1 m cells: ground at 10 m in cells 0, 2, and 4; a 40 m roof over cell 1 and a 20 m one over cell 3.
+    points = write_las(
+        tmp_path / "fixture.las",
+        x=[0.5, 2.5, 4.5, 1.5, 3.5, 0.0, 5.0],
+        y=[0.0] * 7,
+        z=[10.0, 10.0, 10.0, 40.0, 20.0, 10.0, 10.0],
+        classification=[GROUND, GROUND, GROUND, building, building, GROUND, GROUND],
+    )
+
+    capped = load_lidar_surface(points, "capped", cell_size=1.0)
+
+    cap = float(np.percentile([30.0, 10.0], 90))  # the two buildings' heights above the interpolated 10 m ground
+    np.testing.assert_allclose(capped[0], [10.0, 10.0 + cap, 10.0, 20.0, 10.0])
