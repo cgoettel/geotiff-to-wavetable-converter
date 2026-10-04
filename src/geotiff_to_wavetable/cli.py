@@ -22,11 +22,11 @@ from geotiff_to_wavetable.io_utils import (
     write_wt_file,
 )
 from geotiff_to_wavetable.loaders import (
-    GROUND,
     LIDAR_NODATA,
-    CellValue,
+    SURFACES,
+    Surface,
     load_from_geotiff,
-    load_from_lidar,
+    load_lidar_surface,
 )
 from geotiff_to_wavetable.validators import is_band_in_band, validate_wave_size
 
@@ -80,12 +80,18 @@ def output_paths(input_file: str, output_file: str | None, formats: tuple[str, .
 POINT_CLOUD_SUFFIXES = (".las", ".laz")
 
 
-# --surface: which LiDAR points to keep (None keeps every class) and how each grid cell reduces them.
-SURFACES: dict[str, tuple[tuple[int, ...] | None, CellValue]] = {
-    "ground": ((GROUND,), "mean"),  # bare earth, like an elevation model
-    "blended": (None, "mean"),  # every point averaged: canopy blended with the ground beneath
-    "canopy": (None, "highest"),  # the top of every cell: treetops and rooftops
-}
+# One table to convert: a label for its file name (None for a single output) and its array and nodata value.
+Table = tuple[str | None, npt.NDArray[np.float64], float | None]
+
+
+def surface_label(surface: str) -> str:
+    """The file-name label --surface all gives a surface: a letter for sort order, then its name (a-ground, ...)."""
+    return f"{chr(ord('a') + SURFACES.index(surface))}-{surface}"
+
+
+def labeled(path: str, label: str | None) -> str:
+    """Add a table's label to an output path's name: river.wt becomes river-a-ground.wt."""
+    return path if label is None else str(Path(path).with_stem(f"{Path(path).stem}-{label}"))
 
 
 def is_point_cloud(input_file: str) -> bool:
@@ -93,7 +99,7 @@ def is_point_cloud(input_file: str) -> bool:
     return Path(input_file).suffix.lower() in POINT_CLOUD_SUFFIXES
 
 
-def read_raster(args: argparse.Namespace) -> tuple[npt.NDArray[np.float64], float | None]:
+def read_raster(args: argparse.Namespace) -> list[Table]:
     """Open a raster, handle the raster-only options (-b, -i, -v), and return its array and nodata value."""
     # Photos and scans have no map coordinates, and the conversion never uses them anyway, so rasterio's
     # "no geotransform" warning is noise here.
@@ -119,32 +125,42 @@ def read_raster(args: argparse.Namespace) -> tuple[npt.NDArray[np.float64], floa
     band = "auto" if args.band is None else args.band
     logger.info(f"Converting band {band} from {args.input_file}...")
     nodata: float | None = src.nodata
-    return load_from_geotiff(src, args.band), nodata
+    return [(None, load_from_geotiff(src, args.band), nodata)]
 
 
-def read_point_cloud(args: argparse.Namespace) -> tuple[npt.NDArray[np.float64], float | None]:
-    """Read a LAS/LAZ point cloud, handle -i and -v, and return it rasterized, with its nodata value."""
+def read_point_cloud(args: argparse.Namespace) -> list[Table]:
+    """Read a LAS/LAZ point cloud, handle -i and -v, and return each requested surface rasterized."""
     if args.band is not None:
         sys.exit("ERROR: -b/--band picks a raster band; point clouds have none.")
+    if args.surface == "all" and args.visualize:
+        sys.exit("ERROR: -v/--visualize shows one surface; pick it with --surface.")
     points = laspy.read(args.input_file)
     # -i, --info
     if args.info:
         display_point_cloud_info(points)
         sys.exit(0)
 
-    # --surface picks which points to keep and how each cell reduces them; the default is the bare ground.
-    surface = args.surface or "ground"
-    classes, cell_value = SURFACES[surface]
-    logger.info(f"Converting the {surface} surface from {args.input_file}...")
-    try:
-        array = load_from_lidar(points, classes=classes, cell_value=cell_value)
-    except ValueError as error:
-        sys.exit(f"ERROR: {error}")
+    # --surface picks which points to keep and how each cell reduces them; the default is the bare ground. With all,
+    # every surface gets its own file, labeled so they sort together and in order (river-a-ground, river-b-blended).
+    surfaces: tuple[Surface, ...] = SURFACES if args.surface == "all" else (args.surface or "ground",)
+    tables: list[Table] = []
+    for surface in surfaces:
+        logger.info(f"Converting the {surface} surface from {args.input_file}...")
+        try:
+            array = load_lidar_surface(points, surface)
+        except ValueError as error:
+            # A surface the cloud can't make (capped with no ground points, say): fatal on its own, skipped in a batch.
+            if args.surface != "all":
+                sys.exit(f"ERROR: {error}")
+            logger.warning(f"Skipping {surface_label(surface)}: {error}")
+            continue
+        label = surface_label(surface) if args.surface == "all" else None
+        tables.append((label, array, LIDAR_NODATA))
     # -v, --visualize. Shows the rasterized grid, which is what the wavetable is made from.
     if args.visualize:
-        visualize(array)
+        visualize(tables[0][1])
         sys.exit(0)
-    return array, LIDAR_NODATA
+    return tables
 
 
 def configure_logging(verbose: bool, debug: bool) -> None:
@@ -252,13 +268,16 @@ def main() -> None:
 
     parser.add_argument(
         "--surface",
-        choices=SURFACES,
+        choices=(*SURFACES, "all"),
         default=None,
         help=(
             "LiDAR only: which surface to play. ground is the bare earth (trees and buildings removed). blended "
             "averages every point, so trees and buildings rise softly out of the ground. canopy takes the top of each "
-            "spot: treetops and rooftops. Tall trees can take over the range and flatten the terrain under them, so "
-            "which sounds best depends on the place. Default: ground"
+            "spot: treetops and rooftops, with square-edged buildings. clipped is canopy with the tallest 10%% cut "
+            "flat, so a few big trees can't take the whole range. capped keeps the ground's shape and limits how "
+            "far trees and buildings rise above it. all writes every surface to its own file, labeled so they sort "
+            "together: river-a-ground.wt, river-b-blended.wt, and so on. Which sounds best depends on the place. "
+            "Default: ground"
         ),
     )
 
@@ -278,29 +297,37 @@ def main() -> None:
     configure_logging(args.verbose, args.debug)
 
     # Read the input once, handling the options that stop before converting (-i, -v). argparse handles -h on its own.
-    if is_point_cloud(args.input_file):
-        array, nodata = read_point_cloud(args)
-    else:
-        array, nodata = read_raster(args)
+    tables = read_point_cloud(args) if is_point_cloud(args.input_file) else read_raster(args)
 
-    # -o, --output-file and -f, --format: one output path per requested format (see output_paths).
+    # -o, --output-file and -f, --format: one output path per requested format (see output_paths), with each table's
+    # label added when there are several.
     outputs = output_paths(args.input_file, args.output_file, args.format)
-    logger.info(f"Writing {', '.join(outputs.values())}.")
-
-    # -c, --columns. Transposing turns columns into rows, so each column becomes a wave frame. Copy to a contiguous
-    # array: the transpose is a strided view, and nodata cleaning writes into it in place.
-    if args.columns:
-        logger.info("Reading columns as wave frames (--columns).")
-        array = np.ascontiguousarray(array.T)
-    try:
-        samples, wave_size, wave_count = array_to_wavetable(array, nodata=nodata, wave_size=args.wave_size)
-    except ValueError as error:
-        # Unusable input (e.g. an all-nodata band): exit with the message instead of a traceback, matching the
-        # other CLI errors.
-        sys.exit(f"ERROR: {error}")
     writers: dict[str, Callable[[str, list[bytes], int, int], None]] = {"wt": write_wt_file, "wav": write_wav_file}
-    for fmt, path in outputs.items():
-        writers[fmt](path, samples, wave_size, wave_count)
+    written = 0
+    for label, array, nodata in tables:
+        paths = {fmt: labeled(path, label) for fmt, path in outputs.items()}
+        logger.info(f"Writing {', '.join(paths.values())}.")
+
+        # -c, --columns. Transposing turns columns into rows, so each column becomes a wave frame. Copy to a
+        # contiguous array: the transpose is a strided view, and nodata cleaning writes into it in place.
+        if args.columns:
+            logger.info("Reading columns as wave frames (--columns).")
+            array = np.ascontiguousarray(array.T)
+        try:
+            samples, wave_size, wave_count = array_to_wavetable(array, nodata=nodata, wave_size=args.wave_size)
+        except ValueError as error:
+            # Unusable input (e.g. an all-nodata band): exit with the message instead of a traceback, matching the
+            # other CLI errors. In a batch (--surface all), skip just that table, so one flat surface (bare ground
+            # with no relief, say) doesn't cost the others.
+            if label is None:
+                sys.exit(f"ERROR: {error}")
+            logger.warning(f"Skipping {label}: {error}")
+            continue
+        for fmt, path in paths.items():
+            writers[fmt](path, samples, wave_size, wave_count)
+        written += 1
+    if written == 0:
+        sys.exit("ERROR: None of the surfaces could be converted; see the warnings above.")
 
 
 if __name__ == "__main__":

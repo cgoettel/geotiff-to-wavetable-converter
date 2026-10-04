@@ -148,7 +148,17 @@ geotiff-to-wavetable examples/lower-colorado-lcr-000002.laz
 How point clouds are read:
 
 - **Ground points by default.** Points classified as ground (class 2) are kept, and trees, buildings, and noise are dropped. On the example, this matches the GeoTIFF to within a centimeter.
-- **`--surface` picks what to play.** `ground` (the default) is the bare earth. `blended` averages every point, so trees, brush, and buildings rise softly out of the ground. `canopy` takes the top of each spot: treetops and rooftops. On the example, the trees stand up to 30 m over a riverbed that varies by only 3.5 m, so `blended` and `canopy` spend most of their range on the trees and flatten the ground beneath (`canopy` is flat with spikes). There, `ground` sounds best. On a forest or a city, the others may win, so try all three.
+- **`--surface` picks what to play.** Every surface except `ground` keeps all the points, minus noise (stray returns from birds, haze, and the sensor itself):
+  - `ground` (the default): the bare earth.
+  - `blended`: every point averaged, so trees, brush, and buildings rise softly out of the ground.
+  - `canopy`: the top of each spot, so treetops and rooftops. Buildings come out as sharp-edged blocks, which play as square waves.
+  - `clipped`: `canopy` with its tallest 10% cut flat, so a few big trees can't take the whole range. It caps elevation, so on a hill it flattens the hilltop too.
+  - `capped`: the ground's shape, with each tree or building's height above it limited to the 90th percentile of those heights. It keeps hilltops and still reins in the tallest trees and towers. Where a roof or crown hides the ground, the ground beneath is interpolated from the ground around it.
+- **`--surface all` writes every surface at once,** each with a letter and name so they sort together: `river-a-ground.wt`, `river-b-blended.wt`, `river-c-canopy.wt`, `river-d-clipped.wt`, `river-e-capped.wt`. In Bitwig's Polymer, filter the wavetable browser on the name (`river`) and click through them. A surface that comes out flat is skipped with a warning.
+- **Which sounds best depends on the place:**
+  - On the Lower Colorado river, trees up to 30 m tall stand over a riverbed that varies by only 3.5 m. `ground` sounds best there, and `clipped` is a close second.
+  - On a forested mountainside, `clipped` and `capped` shine.
+  - In `examples/portland-downtown.laz`, a city built on nearly flat land, the buildings are the sound. `canopy` is the city as it looks, and `clipped` adds character.
 - **Gridded by density.** Points are binned onto a square grid with cells three times the average point spacing (about 1.2 m on the example), and each cell takes one elevation from its points. Row 0 is north and column 0 is west, the same as a GeoTIFF.
 - **Gaps are filled.** Cells with no ground point, mostly water (which returns little of the laser), get the mean elevation, like nodata in a GeoTIFF. About 15% of the example is river.
 - **`-i` lists the classes.** It prints the point count and how many points are in each class, for example `Class 2 (ground): 1098401`. `-v` shows the grid the wavetable will be made from. `-b` doesn't apply, since point clouds have no bands.

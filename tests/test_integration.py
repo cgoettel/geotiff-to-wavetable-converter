@@ -735,3 +735,60 @@ def test_logging_goes_to_stderr_not_a_file(
     assert ("INFO: Produced wavetable" in stderr) == shows_info
     assert ("DEBUG: Resizing" in stderr) == shows_debug
     assert sorted(path.name for path in tmp_path.iterdir()) == ["terrain.tif", "terrain.wt"]
+
+
+def test_surface_all_writes_every_surface_labeled_in_order(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """--surface all writes one table per surface, lettered so they sort together and in order, for every format."""
+    source = write_point_cloud(tmp_path / "terrain.las")  # rippled ground, so no surface is flat
+
+    run_cli(monkeypatch, tmp_path, str(source), "--surface", "all", "-f", "wt,wav", "-o", "grove.wt")
+
+    names = ["a-ground", "b-blended", "c-canopy", "d-clipped", "e-capped"]
+    expected = sorted(f"grove-{name}.{fmt}" for name in names for fmt in ("wt", "wav"))
+    assert sorted(path.name for path in tmp_path.iterdir() if path.name != "terrain.las") == expected
+    canopy = read_wt(tmp_path / "grove-c-canopy.wt")
+    assert canopy.wave_count == 14  # the 40x40 lattice at 3x spacing, as for one surface
+
+
+def test_surface_all_refuses_to_visualize(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """-v shows one grid, so it needs one surface."""
+    source = write_forest(tmp_path / "forest.las")
+
+    with pytest.raises(SystemExit) as exc_info:
+        run_cli(monkeypatch, tmp_path, str(source), "--surface", "all", "-v")
+
+    assert exc_info.value.code == "ERROR: -v/--visualize shows one surface; pick it with --surface."
+
+
+def test_surface_all_skips_a_flat_surface_and_writes_the_rest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Flat surfaces are skipped with a warning, and the rest still write.
+
+    Level ground under level treetops, plus one 60 m tree. Ground is flat. Clipping and capping both cut the lone tree
+    back to the 90th percentile, the level treetops, so those are flat too. Blended and canopy keep the tree.
+    """
+    source = write_forest(tmp_path / "forest.las")
+    with laspy.open(source, mode="a") as appender:  # one 60 m tree, so the canopy surfaces aren't flat too
+        extra = laspy.ScaleAwarePointRecord.zeros(1, header=appender.header)
+        extra.x, extra.y, extra.z, extra.classification = [20.0], [20.0], [60.0], [5]
+        appender.append_points(extra)
+
+    run_cli(monkeypatch, tmp_path, str(source), "--surface", "all")
+
+    stderr = capsys.readouterr().err
+    for skipped in ("a-ground", "d-clipped", "e-capped"):
+        assert f"WARNING: Skipping {skipped}: The selected band is flat" in stderr
+    written = sorted(path.name for path in tmp_path.glob("*.wt"))
+    assert written == ["forest-b-blended.wt", "forest-c-canopy.wt"]
+
+
+def test_surface_all_fails_when_nothing_converts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """If every surface is unusable, the run fails instead of quietly writing nothing."""
+    source = write_forest(tmp_path / "forest.las")  # level ground and level treetops: every surface is flat
+
+    with pytest.raises(SystemExit) as exc_info:
+        run_cli(monkeypatch, tmp_path, str(source), "--surface", "all")
+
+    assert exc_info.value.code == "ERROR: None of the surfaces could be converted; see the warnings above."
+    assert not list(tmp_path.glob("*.wt"))
