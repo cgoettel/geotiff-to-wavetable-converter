@@ -5,15 +5,41 @@ list-of-bytes / wave-size / wave-count tuple expected by `write_wt_file`.
 """
 
 import logging
-from typing import cast
+from typing import Literal, cast, get_args
 
 import cv2
 import numpy as np
 import numpy.typing as npt
+from rasterio.fill import fillnodata
 
 from geotiff_to_wavetable.validators import validate_wave_size
 
 logger = logging.getLogger(__name__)
+
+# How gaps (nodata pixels, empty LiDAR cells) are filled before conversion: with the mean of the valid data, or
+# interpolated from the valid cells around each gap.
+Fill = Literal["mean", "interpolate"]
+FILLS: tuple[Fill, ...] = get_args(Fill)
+
+
+def interpolate_gaps(array: npt.NDArray[np.float64], valid: npt.NDArray[np.bool_]) -> npt.NDArray[np.float64]:
+    """Estimate every invalid cell from the valid cells around it (GDAL's inverse-distance fillnodata).
+
+    The search reaches across the whole grid, so every gap is filled however wide it is. Valid cells are unchanged.
+
+    Args:
+        array: A 2D array. Values in invalid cells are ignored.
+        valid: True where `array` holds real data. At least one cell must be valid.
+
+    Returns:
+        A new array with every invalid cell filled.
+    """
+    height, width = array.shape
+    reach = float(np.hypot(height, width)) + 1
+    filled: npt.NDArray[np.float64] = fillnodata(
+        array.astype(np.float64), mask=valid, max_search_distance=reach, smoothing_iterations=0
+    )
+    return filled
 
 
 def calculate_height(height: int) -> int:
@@ -76,16 +102,20 @@ def shift_bit_length(num: int) -> int:
 def _clean_nodata(
     bands: npt.NDArray[np.float64],
     nodata_value: float | None,
+    fill: Fill = "mean",
 ) -> tuple[npt.NDArray[np.float64], float]:
-    """Replace nodata/NaN values in-place with the mean of valid data.
+    """Replace nodata/NaN values in place, with the mean of valid data or interpolated from their neighbors.
 
     GeoTIFFs often have a nodata sentinel (for clouds, oceans, gaps, etc.).
     Leaving those values in skews the normalization step and produces
-    DC-offset artifacts in the wavetable.
+    DC-offset artifacts in the wavetable. The mean is fine on flat ground but
+    leaves a spike or a pit in every gap on a slope; interpolating follows the
+    terrain across the gap instead.
 
     Args:
         bands: The input 2D array. Modified in place.
         nodata_value: The dataset's nodata sentinel, or None if unset.
+        fill: "mean" or "interpolate".
 
     Returns:
         A tuple of (cleaned array, percentage of pixels that were valid).
@@ -107,7 +137,15 @@ def _clean_nodata(
         logger.error("Selected band contains only nodata/NaN values — cannot proceed.")
         raise ValueError("The selected band contains only nodata/NaN values. Try a different band or file.")
 
-    bands[~valid_mask] = bands[valid_mask].mean()
+    if valid_mask.all():
+        pass
+    elif fill == "mean":
+        bands[~valid_mask] = bands[valid_mask].mean()
+    elif fill == "interpolate":
+        logger.debug(f"Interpolating {int((~valid_mask).sum())} gaps from their neighbors.")
+        bands[~valid_mask] = interpolate_gaps(bands, valid_mask)[~valid_mask]
+    else:
+        raise ValueError(f"Fill must be one of {', '.join(FILLS)}; got {fill!r}.")
 
     if valid_percentage < 10:
         logger.error(f"Only {valid_percentage:.1f}% valid data — output will likely be unusable.")
@@ -190,6 +228,7 @@ def array_to_wavetable(
     array: npt.NDArray[np.float64],
     nodata: float | None = None,
     wave_size: int | None = None,
+    fill: Fill = "mean",
 ) -> tuple[list[bytes], int, int]:
     """Convert a raw 2D array into wavetable byte data.
 
@@ -202,6 +241,8 @@ def array_to_wavetable(
             array has no nodata values.
         wave_size: Samples per wave frame: a power of 2 in [2, 4096]. None picks
             the array's width rounded up to a power of 2 (capped at 4096).
+        fill: How nodata gaps are filled: "mean" (the mean of the valid data)
+            or "interpolate" (estimated from the valid cells around each gap).
 
     Returns:
         A tuple of (byte frames list, wave size / width, wave count / height)
@@ -217,7 +258,7 @@ def array_to_wavetable(
     height, width = array.shape
     logger.info(f"Converting {height}x{width} array to wavetable (nodata={nodata}).")
 
-    cleaned, valid_percentage = _clean_nodata(array, nodata)
+    cleaned, valid_percentage = _clean_nodata(array, nodata, fill)
 
     # Capture the valid range AFTER cleaning (so nodata-replacement values are
     # included) but BEFORE resize (so cubic interpolation overshoot gets clipped

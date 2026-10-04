@@ -32,7 +32,8 @@ import numpy as np
 import numpy.typing as npt
 import rasterio
 from rasterio.enums import ColorInterp
-from rasterio.fill import fillnodata
+
+from geotiff_to_wavetable.converter import interpolate_gaps
 
 logger = logging.getLogger(__name__)
 
@@ -315,14 +316,11 @@ def load_lidar_surface(
     top = _reduce(grid, cells, z, "highest")
     ground = _reduce(grid, cells[ground_points], z[ground_points], "mean")
     # A roof or a dense crown hides the ground beneath it, so those cells have no ground point. Estimate it from the
-    # surrounding ground (GDAL's inverse-distance fill, searching as far as the grid is wide), or every building
-    # would come out empty and be mean-filled instead of capped.
+    # surrounding ground, or every building would come out empty and be mean-filled instead of capped.
     missing = np.isnan(ground)
     if missing.any():
         logger.info(f"Interpolating the ground under {int(missing.sum())} cells that have no ground point.")
-        ground = fillnodata(
-            ground, mask=~missing, max_search_distance=float(max(grid.width, grid.height)), smoothing_iterations=0
-        )
+        ground = interpolate_gaps(ground, ~missing)
     height_above = np.clip(top - ground, 0, None)  # NaN only where a cell has no point at all
     structures = height_above[height_above > STRUCTURE_HEIGHT]
     cap = float(np.percentile(structures, CAP_PERCENTILE)) if structures.size else 0.0

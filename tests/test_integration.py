@@ -792,3 +792,23 @@ def test_surface_all_fails_when_nothing_converts(tmp_path: Path, monkeypatch: py
 
     assert exc_info.value.code == "ERROR: None of the surfaces could be converted; see the warnings above."
     assert not list(tmp_path.glob("*.wt"))
+
+
+@pytest.mark.parametrize("fill", ["mean", "interpolate"])
+def test_fill_option_reaches_the_converter(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fill: str) -> None:
+    """--fill picks how gaps are filled, for rasters and point clouds alike; mean is the default."""
+    source = write_geotiff(tmp_path / "terrain.tif", gradient(8, 16))
+    seen: list[object] = []
+
+    def capture(array: npt.NDArray[np.float64], **options: object) -> None:
+        """Stand in for the converter: record the fill option, then stop before writing anything."""
+        seen.append(options["fill"])
+        sys.exit(0)
+
+    monkeypatch.setattr("geotiff_to_wavetable.cli.array_to_wavetable", capture)
+    extra = () if fill == "mean" else ("--fill", fill)
+
+    with pytest.raises(SystemExit):
+        run_cli(monkeypatch, tmp_path, str(source), *extra)
+
+    assert seen == [fill]

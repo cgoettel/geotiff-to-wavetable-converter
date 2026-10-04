@@ -13,7 +13,7 @@ import numpy.typing as npt
 import rasterio
 from rasterio.errors import NotGeoreferencedWarning
 
-from geotiff_to_wavetable.converter import array_to_wavetable
+from geotiff_to_wavetable.converter import FILLS, array_to_wavetable
 from geotiff_to_wavetable.io_utils import (
     display_info,
     display_point_cloud_info,
@@ -282,6 +282,17 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "--fill",
+        choices=FILLS,
+        default="mean",
+        help=(
+            "How gaps are filled: nodata in a raster, or LiDAR cells no point landed in (water, ground hidden under "
+            "trees or roofs). mean uses the average of everything else, which suits flat ground but leaves a spike "
+            "or a pit in every gap on a slope. interpolate estimates each gap from the cells around it, so it "
+            "follows the terrain. Default: mean"
+        ),
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Also print progress messages (what was read, how it was gridded or resized) to stderr.",
@@ -314,7 +325,9 @@ def main() -> None:
             logger.info("Reading columns as wave frames (--columns).")
             array = np.ascontiguousarray(array.T)
         try:
-            samples, wave_size, wave_count = array_to_wavetable(array, nodata=nodata, wave_size=args.wave_size)
+            samples, wave_size, wave_count = array_to_wavetable(
+                array, nodata=nodata, wave_size=args.wave_size, fill=args.fill
+            )
         except ValueError as error:
             # Unusable input (e.g. an all-nodata band): exit with the message instead of a traceback, matching the
             # other CLI errors. In a batch (--surface all), skip just that table, so one flat surface (bare ground
