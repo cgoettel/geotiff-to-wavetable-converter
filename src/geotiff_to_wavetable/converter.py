@@ -102,7 +102,7 @@ def shift_bit_length(num: int) -> int:
 def _clean_nodata(
     bands: npt.NDArray[np.float64],
     nodata_value: float | None,
-    fill: Fill = "mean",
+    fill: Fill = "interpolate",
 ) -> tuple[npt.NDArray[np.float64], float]:
     """Replace nodata/NaN values in place, with the mean of valid data or interpolated from their neighbors.
 
@@ -115,7 +115,7 @@ def _clean_nodata(
     Args:
         bands: The input 2D array. Modified in place.
         nodata_value: The dataset's nodata sentinel, or None if unset.
-        fill: "mean" or "interpolate".
+        fill: "interpolate" (the default) or "mean".
 
     Returns:
         A tuple of (cleaned array, percentage of pixels that were valid).
@@ -228,7 +228,7 @@ def array_to_wavetable(
     array: npt.NDArray[np.float64],
     nodata: float | None = None,
     wave_size: int | None = None,
-    fill: Fill = "mean",
+    fill: Fill = "interpolate",
 ) -> tuple[list[bytes], int, int]:
     """Convert a raw 2D array into wavetable byte data.
 
@@ -241,8 +241,9 @@ def array_to_wavetable(
             array has no nodata values.
         wave_size: Samples per wave frame: a power of 2 in [2, 4096]. None picks
             the array's width rounded up to a power of 2 (capped at 4096).
-        fill: How nodata gaps are filled: "mean" (the mean of the valid data)
-            or "interpolate" (estimated from the valid cells around each gap).
+        fill: How nodata gaps are filled: "interpolate" (estimated from the
+            valid cells around each gap, the default) or "mean" (the mean of
+            the valid data).
 
     Returns:
         A tuple of (byte frames list, wave size / width, wave count / height)

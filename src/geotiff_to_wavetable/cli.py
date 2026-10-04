@@ -284,12 +284,12 @@ def main() -> None:
     parser.add_argument(
         "--fill",
         choices=FILLS,
-        default="mean",
+        default="interpolate",
         help=(
             "How gaps are filled: nodata in a raster, or LiDAR cells no point landed in (water, ground hidden under "
-            "trees or roofs). mean uses the average of everything else, which suits flat ground but leaves a spike "
-            "or a pit in every gap on a slope. interpolate estimates each gap from the cells around it, so it "
-            "follows the terrain. Default: mean"
+            "trees or roofs). interpolate estimates each gap from the cells around it, so it follows the terrain. "
+            "mean uses the average of everything else, which suits flat ground but leaves a spike or a pit in "
+            "every gap on a slope. Default: interpolate"
         ),
     )
     parser.add_argument(
