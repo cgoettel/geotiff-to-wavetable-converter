@@ -139,8 +139,9 @@ geotiff-to-wavetable examples/lower-colorado-lcr-000002.laz
 
 How point clouds are read:
 
-- **Ground points only.** Points classified as ground (class 2) are kept, and trees, buildings, and noise are dropped. On the example, this matches the GeoTIFF to within a centimeter.
-- **Gridded by density.** Points are binned onto a square grid with cells three times the average point spacing (about 1.2 m on the example), and each cell takes the mean elevation of its points. Row 0 is north and column 0 is west, the same as a GeoTIFF.
+- **Ground points by default.** Points classified as ground (class 2) are kept, and trees, buildings, and noise are dropped. On the example, this matches the GeoTIFF to within a centimeter.
+- **`--surface` picks what to play.** `ground` (the default) is the bare earth. `blended` averages every point, so trees, brush, and buildings rise softly out of the ground. `canopy` takes the top of each spot: treetops and rooftops. On the example, the trees stand up to 30 m over a riverbed that varies by only 3.5 m, so `blended` and `canopy` spend most of their range on the trees and flatten the ground beneath (`canopy` is flat with spikes). There, `ground` sounds best. On a forest or a city, the others may win, so try all three.
+- **Gridded by density.** Points are binned onto a square grid with cells three times the average point spacing (about 1.2 m on the example), and each cell takes one elevation from its points. Row 0 is north and column 0 is west, the same as a GeoTIFF.
 - **Gaps are filled.** Cells with no ground point, mostly water (which returns little of the laser), get the mean elevation, like nodata in a GeoTIFF. About 15% of the example is river.
 - **`-i` lists the classes.** It prints the point count and how many points are in each class, for example `Class 2 (ground): 1098401`. `-v` shows the grid the wavetable will be made from. `-b` doesn't apply, since point clouds have no bands.
 

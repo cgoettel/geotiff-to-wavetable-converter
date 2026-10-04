@@ -2,6 +2,12 @@
 
 All notable changes to this project. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- `--surface ground|blended|canopy` chooses which LiDAR surface to play (#30). `ground` (the default) is the bare earth, `blended` averages every point so trees and buildings rise softly out of it, and `canopy` takes the top of each spot. `load_from_lidar` gains a `cell_value` argument (`mean` or `highest`) to go with `classes`.
+
 ## [0.4.0] - 2026-10-03
 
 ### Added

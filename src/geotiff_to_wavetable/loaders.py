@@ -24,6 +24,7 @@ because their bands are color channels rather than independent measurements:
 
 import logging
 from collections.abc import Collection
+from typing import Literal, get_args
 
 import laspy
 import numpy as np
@@ -50,6 +51,10 @@ CELL_SPACINGS = 3.0
 
 # The nodata value load_from_lidar uses for cells no point landed in.
 LIDAR_NODATA = float("nan")
+
+# How load_from_lidar reduces the elevations in one cell to a single value.
+CellValue = Literal["mean", "highest"]
+CELL_VALUES: tuple[CellValue, ...] = get_args(CellValue)
 
 
 def is_rgb(dataset: rasterio.io.DatasetReader) -> bool:
@@ -107,16 +112,20 @@ def load_from_lidar(
     points: laspy.LasData,
     classes: Collection[int] | None = (GROUND,),
     cell_size: float | None = None,
+    cell_value: CellValue = "mean",
 ) -> npt.NDArray[np.float64]:
     """Rasterize a LAS/LAZ point cloud into one 2D float64 array of elevations.
 
     Points are binned onto a square grid in the file's own horizontal units, and
-    each cell takes the mean elevation of the points inside it. Row 0 is the
-    north edge and column 0 the west edge, the same orientation as a raster.
+    each cell takes the mean (or highest) elevation of the points inside it. Row
+    0 is the north edge and column 0 the west edge, the same orientation as a
+    raster.
 
     The default keeps ground returns only, which gives the same surface as a
     bare-earth elevation model. Pass `classes=None` to keep every point
-    (vegetation, buildings, noise), which gives a rougher surface.
+    (vegetation, buildings, noise), which gives a rougher surface. With every
+    point, `cell_value="highest"` traces the treetops and rooftops (a surface
+    model), while `"mean"` blends them with the ground beneath.
 
     Cells no point landed in (water, mostly) are `LIDAR_NODATA` (NaN). Pass
     `LIDAR_NODATA` as `array_to_wavetable`'s nodata so it can fill them.
@@ -127,12 +136,14 @@ def load_from_lidar(
         cell_size: Grid cell width in the file's horizontal units (meters for
             Web Mercator, which stretches ground distances by 1/cos(latitude)).
             None picks `CELL_SPACINGS` times the average point spacing.
+        cell_value: How each cell reduces its points' elevations: "mean" or "highest".
 
     Returns:
         A 2D float64 array, one cell per grid square.
 
     Raises:
-        ValueError: if no point has one of `classes`, or `cell_size` isn't positive.
+        ValueError: if no point has one of `classes`, `cell_size` isn't positive,
+            or `cell_value` isn't one of `CELL_VALUES`.
     """
     header = points.header
     logger.info(
@@ -172,13 +183,22 @@ def load_from_lidar(
     cells = (rows * width + columns).astype(np.intp)
 
     counts = np.bincount(cells, minlength=width * height)
-    sums = np.bincount(cells, weights=z, minlength=width * height)
-    grid = np.full(width * height, LIDAR_NODATA)
     occupied = counts > 0
-    grid[occupied] = sums[occupied] / counts[occupied]
+    grid = np.full(width * height, LIDAR_NODATA)
+    if cell_value == "mean":
+        sums = np.bincount(cells, weights=z, minlength=width * height)
+        grid[occupied] = sums[occupied] / counts[occupied]
+    elif cell_value == "highest":
+        highest = np.full(width * height, -np.inf)
+        np.maximum.at(highest, cells, z)
+        grid[occupied] = highest[occupied]
+    else:
+        raise ValueError(f"Cell value must be one of {', '.join(CELL_VALUES)}; got {cell_value!r}.")
 
     empty_percentage = 100 * (1 - occupied.mean())
-    logger.info(f"Rasterized to {height}x{width} cells of {cell_size:.3f}; {empty_percentage:.1f}% empty.")
+    logger.info(
+        f"Rasterized to {height}x{width} cells of {cell_size:.3f} ({cell_value}); {empty_percentage:.1f}% empty."
+    )
     return grid.reshape(height, width)
 
 
