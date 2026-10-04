@@ -2,6 +2,12 @@
 
 All notable changes to this project. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- `examples/portland-downtown.laz` and `examples/portland-downtown.tif`: a 250 m square of downtown Portland, Oregon at the foot of the West Hills, as a LiDAR point cloud (1.54 million points, 2019) and the matching USGS 1 m elevation model. The ground slopes only 14 m, but the towers rise up to 132 m above it. A city is built on a boring plot of land, and its buildings make the sound interesting. Public domain, cropped from the [USGS 3DEP copies on AWS](https://registry.opendata.aws/usgs-lidar/).
+
 ## [0.5.0] - 2026-10-04
 
 ### Added
