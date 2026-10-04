@@ -30,7 +30,7 @@ For these examples, we'll use the GeoTIFF of the lower Colorado River that ships
 
 The tool automatically:
 
-- Replaces nodata values (like -999999) with the mean elevation, or, with `--fill interpolate`, with an estimate from the surrounding terrain
+- Fills nodata values (like -999999) by estimating them from the surrounding terrain, or, with `--fill mean`, with the mean elevation
 - Resizes your terrain to valid dimensions (width: power of 2 between 2–4096, height: max 512)
 - Normalizes elevation values to audio range (-32768 to 32767 for int16 format)
 
@@ -160,7 +160,7 @@ How point clouds are read:
   - On a forested mountainside, `clipped` and `capped` shine.
   - In `examples/portland-downtown.laz`, a city built on nearly flat land, the buildings are the sound. `canopy` is the city as it looks, and `clipped` adds character.
 - **Gridded by density.** Points are binned onto a square grid with cells three times the average point spacing (about 1.2 m on the example), and each cell takes one elevation from its points. Row 0 is north and column 0 is west, the same as a GeoTIFF.
-- **Gaps are filled.** Cells with no point, mostly water (which returns little of the laser) and ground hidden under trees or roofs, get the mean elevation by default, like nodata in a GeoTIFF. About 15% of the example is river. On a slope, the mean leaves a spike or a pit in every gap. `--fill interpolate` estimates each gap from the cells around it instead, so it follows the terrain (and bridges a river smoothly).
+- **Gaps are filled.** Cells with no point, mostly water (which returns little of the laser) and ground hidden under trees or roofs, are estimated from the cells around them, like nodata in a GeoTIFF, so they follow the terrain (and bridge a river smoothly). About 15% of the example is river. `--fill mean` fills them with the mean elevation instead, which leaves a spike or a pit in every gap on a slope.
 - **`-i` lists the classes.** It prints the point count and how many points are in each class, for example `Class 2 (ground): 1098401`. `-v` shows the grid the wavetable will be made from. `-b` doesn't apply, since point clouds have no bands.
 
 ### Importing into Bitwig

@@ -86,7 +86,7 @@ def test_clean_nodata_partial_replaces_with_mean() -> None:
         ]
     )
     expected_mean = (1.0 + 2.0 + 3.0 + 4.0) / 4
-    cleaned, valid_pct = _clean_nodata(bands, nodata_value=-9999.0)
+    cleaned, valid_pct = _clean_nodata(bands, nodata_value=-9999.0, fill="mean")
     assert valid_pct == 50.0
     assert cleaned[0, 0] == 1.0
     assert cleaned[0, 2] == expected_mean

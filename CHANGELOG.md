@@ -6,7 +6,11 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 
 ### Added
 
-- `--fill mean|interpolate` chooses how gaps are filled: nodata in a raster, or LiDAR cells no point landed in (#33). `mean` (the default) uses the average of the valid data, which leaves a spike or a pit in every gap on a slope. `interpolate` estimates each gap from the cells around it, so it follows the terrain. `array_to_wavetable` takes a matching `fill` argument, and `interpolate_gaps` is exported.
+- `--fill mean|interpolate` chooses how gaps are filled: nodata in a raster, or LiDAR cells no point landed in (#33). `interpolate` estimates each gap from the cells around it, so it follows the terrain. `mean` uses the average of the valid data, which leaves a spike or a pit in every gap on a slope. `array_to_wavetable` takes a matching `fill` argument, and `interpolate_gaps` is exported.
+
+### Changed
+
+- Gaps are interpolated by default, in the CLI and in `array_to_wavetable`. Compared by ear on all three example places, the sound barely changes, but the tables look like the land, without the spikes or flat bands the mean left. `--fill mean` (or `fill="mean"`) restores the old behavior.
 
 ## [0.6.0] - 2026-10-04
 

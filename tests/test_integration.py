@@ -796,7 +796,7 @@ def test_surface_all_fails_when_nothing_converts(tmp_path: Path, monkeypatch: py
 
 @pytest.mark.parametrize("fill", ["mean", "interpolate"])
 def test_fill_option_reaches_the_converter(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fill: str) -> None:
-    """--fill picks how gaps are filled, for rasters and point clouds alike; mean is the default."""
+    """--fill picks how gaps are filled, for rasters and point clouds alike; interpolate is the default."""
     source = write_geotiff(tmp_path / "terrain.tif", gradient(8, 16))
     seen: list[object] = []
 
@@ -806,7 +806,7 @@ def test_fill_option_reaches_the_converter(tmp_path: Path, monkeypatch: pytest.M
         sys.exit(0)
 
     monkeypatch.setattr("geotiff_to_wavetable.cli.array_to_wavetable", capture)
-    extra = () if fill == "mean" else ("--fill", fill)
+    extra = () if fill == "interpolate" else ("--fill", fill)
 
     with pytest.raises(SystemExit):
         run_cli(monkeypatch, tmp_path, str(source), *extra)
