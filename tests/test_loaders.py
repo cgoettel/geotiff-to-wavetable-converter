@@ -371,3 +371,24 @@ def test_capped_interpolates_the_ground_under_buildings(tmp_path: Path) -> None:
 
     cap = float(np.percentile([30.0, 10.0], 90))  # the two buildings' heights above the interpolated 10 m ground
     np.testing.assert_allclose(capped[0], [10.0, 10.0 + cap, 10.0, 20.0, 10.0])
+
+
+def test_percentiles_change_where_clipped_and_capped_cut(tmp_path: Path) -> None:
+    """At 100, clipped is the canopy and capped keeps every height; lower values cut harder."""
+    points = hillside(tmp_path / "fixture.las")
+    canopy = load_lidar_surface(points, "canopy", cell_size=1.0)
+
+    np.testing.assert_array_equal(load_lidar_surface(points, "clipped", cell_size=1.0, clip_percentile=100), canopy)
+    np.testing.assert_allclose(load_lidar_surface(points, "capped", cell_size=1.0, cap_percentile=100)[0], canopy[0])
+    gentle = load_lidar_surface(points, "clipped", cell_size=1.0, clip_percentile=95)
+    hard = load_lidar_surface(points, "clipped", cell_size=1.0, clip_percentile=50)
+    assert np.nanmax(hard) < np.nanmax(gentle) < np.nanmax(canopy)
+
+
+@pytest.mark.parametrize("keyword", ["clip_percentile", "cap_percentile"])
+@pytest.mark.parametrize("value", [0.0, -1.0, 100.1])
+def test_percentiles_out_of_range_raise(tmp_path: Path, keyword: str, value: float) -> None:
+    points = hillside(tmp_path / "fixture.las")
+
+    with pytest.raises(ValueError, match="percentile must be above 0 and at most 100"):
+        load_lidar_surface(points, "clipped", **{keyword: value})

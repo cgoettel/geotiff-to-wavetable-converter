@@ -2,6 +2,12 @@
 
 All notable changes to this project. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- `--clip-percentile` and `--cap-percentile` move where `--surface clipped` and `capped` cut, from above 0 up to 100 (default 90) (#34). They're refused with any other surface, so a setting is never silently ignored. `load_lidar_surface` takes matching `clip_percentile` and `cap_percentile` arguments.
+
 ## [0.7.0] - 2026-10-04
 
 ### Added
