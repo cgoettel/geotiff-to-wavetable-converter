@@ -22,6 +22,8 @@ from geotiff_to_wavetable.io_utils import (
     write_wt_file,
 )
 from geotiff_to_wavetable.loaders import (
+    CAP_PERCENTILE,
+    CLIP_PERCENTILE,
     LIDAR_NODATA,
     SURFACES,
     Surface,
@@ -47,6 +49,17 @@ def wave_size_argument(value: str) -> int:
     if not validate_wave_size(wave_size):
         raise argparse.ArgumentTypeError(f"{wave_size} is not a power of 2 between 2 and 4096")
     return wave_size
+
+
+def percentile_argument(value: str) -> float:
+    """Argparse type for --clip-percentile and --cap-percentile: a number above 0 and at most 100."""
+    try:
+        percentile = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value!r} is not a number") from None
+    if not 0 < percentile <= 100:
+        raise argparse.ArgumentTypeError(f"{value} is not above 0 and at most 100")
+    return percentile
 
 
 FORMATS = ("wt", "wav")
@@ -108,8 +121,11 @@ def read_raster(args: argparse.Namespace) -> list[Table]:
     if src.crs is None:
         logger.info(f"{args.input_file} has no georeferencing (a photo or scan?); treating it as a plain image.")
 
-    if args.surface is not None:
-        sys.exit("ERROR: --surface applies to LiDAR point clouds (.las, .laz), not rasters.")
+    if args.surface is not None or args.clip_percentile is not None or args.cap_percentile is not None:
+        sys.exit(
+            "ERROR: --surface, --clip-percentile, and --cap-percentile apply to LiDAR point clouds (.las, .laz), "
+            "not rasters."
+        )
     # -b, --band. If the provided band is out-of-band, print an error message and exit.
     if args.band is not None:
         is_band_in_band(src, args.band)
@@ -134,6 +150,10 @@ def read_point_cloud(args: argparse.Namespace) -> list[Table]:
         sys.exit("ERROR: -b/--band picks a raster band; point clouds have none.")
     if args.surface == "all" and args.visualize:
         sys.exit("ERROR: -v/--visualize shows one surface; pick it with --surface.")
+    if args.clip_percentile is not None and args.surface not in ("clipped", "all"):
+        sys.exit("ERROR: --clip-percentile applies to --surface clipped (or all).")
+    if args.cap_percentile is not None and args.surface not in ("capped", "all"):
+        sys.exit("ERROR: --cap-percentile applies to --surface capped (or all).")
     points = laspy.read(args.input_file)
     # -i, --info
     if args.info:
@@ -147,7 +167,12 @@ def read_point_cloud(args: argparse.Namespace) -> list[Table]:
     for surface in surfaces:
         logger.info(f"Converting the {surface} surface from {args.input_file}...")
         try:
-            array = load_lidar_surface(points, surface)
+            array = load_lidar_surface(
+                points,
+                surface,
+                clip_percentile=args.clip_percentile or CLIP_PERCENTILE,
+                cap_percentile=args.cap_percentile or CAP_PERCENTILE,
+            )
         except ValueError as error:
             # A surface the cloud can't make (capped with no ground points, say): fatal on its own, skipped in a batch.
             if args.surface != "all":
@@ -281,6 +306,25 @@ def main() -> None:
         ),
     )
 
+    parser.add_argument(
+        "--clip-percentile",
+        type=percentile_argument,
+        default=None,
+        help=(
+            "LiDAR only, for --surface clipped (or all): where to cut the canopy flat, as a percentile of its "
+            "elevations, above 0 and up to 100. Lower cuts more: 75 flattens the top quarter. Default: 90"
+        ),
+    )
+    parser.add_argument(
+        "--cap-percentile",
+        type=percentile_argument,
+        default=None,
+        help=(
+            "LiDAR only, for --surface capped (or all): how high trees and buildings may rise above the ground, as "
+            "a percentile of their heights, above 0 and up to 100. Lower caps harder; 100 keeps every height. "
+            "Default: 90"
+        ),
+    )
     parser.add_argument(
         "--fill",
         choices=FILLS,

@@ -253,6 +253,8 @@ def load_lidar_surface(
     points: laspy.LasData,
     surface: Surface = "ground",
     cell_size: float | None = None,
+    clip_percentile: float = CLIP_PERCENTILE,
+    cap_percentile: float = CAP_PERCENTILE,
 ) -> npt.NDArray[np.float64]:
     """Rasterize one named surface of a LAS/LAZ point cloud.
 
@@ -261,11 +263,11 @@ def load_lidar_surface(
     - ground: ground points, mean per cell. The bare earth, like an elevation model.
     - blended: mean per cell, so trees and buildings rise softly out of the ground.
     - canopy: highest per cell: treetops and rooftops, with square-edged buildings.
-    - clipped: canopy, capped at its `CLIP_PERCENTILE` elevation, so a few tall
+    - clipped: canopy, capped at its `clip_percentile` elevation, so a few tall
       trees can't take the whole range. On hilly ground this also flattens the
       hilltops, since it caps elevation rather than height.
     - capped: ground plus each tree or building's height above it, capped at
-      the `CAP_PERCENTILE` of those heights. It keeps hilltops and still
+      the `cap_percentile` of those heights. It keeps hilltops and still
       reins in the tallest trees. Where a roof or crown hides the ground, the
       ground beneath is interpolated from the ground around it.
 
@@ -274,14 +276,23 @@ def load_lidar_surface(
         surface: One of `SURFACES`.
         cell_size: Grid cell width in the file's horizontal units, or None to
             pick one from the point density (see `load_from_lidar`).
+        clip_percentile: For clipped, the percentile of canopy elevations to cut
+            at, above 0 and up to 100. Lower cuts more; 100 leaves the canopy whole.
+        cap_percentile: For capped, the percentile of tree and building heights
+            to cap at, above 0 and up to 100. Lower caps harder; 100 keeps every
+            height.
 
     Returns:
         A 2D float64 array, with `LIDAR_NODATA` (NaN) in empty cells.
 
     Raises:
-        ValueError: if `surface` is unknown, or the cloud lacks the points the
-            surface needs (ground points, or anything besides noise).
+        ValueError: if `surface` is unknown, a percentile is out of range, or
+            the cloud lacks the points the surface needs (ground points, or
+            anything besides noise).
     """
+    for name, percentile in (("Clip", clip_percentile), ("Cap", cap_percentile)):
+        if not 0 < percentile <= 100:
+            raise ValueError(f"{name} percentile must be above 0 and at most 100; got {percentile}.")
     if surface == "ground":
         return load_from_lidar(points, cell_size=cell_size)
     if surface not in SURFACES:
@@ -298,8 +309,8 @@ def load_lidar_surface(
         canopy = load_from_lidar(points, classes=classes, cell_size=cell_size, cell_value="highest")
         if surface == "canopy":
             return canopy
-        ceiling = np.nanpercentile(canopy, CLIP_PERCENTILE)
-        logger.info(f"Clipping the canopy at {ceiling:.2f} (its {CLIP_PERCENTILE:g}th percentile).")
+        ceiling = np.nanpercentile(canopy, clip_percentile)
+        logger.info(f"Clipping the canopy at {ceiling:.2f} (its {clip_percentile:g}th percentile).")
         clipped: npt.NDArray[np.float64] = np.minimum(canopy, ceiling)
         return clipped
 
@@ -323,9 +334,9 @@ def load_lidar_surface(
         ground = interpolate_gaps(ground, ~missing)
     height_above = np.clip(top - ground, 0, None)  # NaN only where a cell has no point at all
     structures = height_above[height_above > STRUCTURE_HEIGHT]
-    cap = float(np.percentile(structures, CAP_PERCENTILE)) if structures.size else 0.0
+    cap = float(np.percentile(structures, cap_percentile)) if structures.size else 0.0
     logger.info(
-        f"Capping heights above ground at {cap:.2f} (the {CAP_PERCENTILE:g}th percentile of {structures.size} cells "
+        f"Capping heights above ground at {cap:.2f} (the {cap_percentile:g}th percentile of {structures.size} cells "
         f"taller than {STRUCTURE_HEIGHT:g})."
     )
     capped: npt.NDArray[np.float64] = ground + np.minimum(height_above, cap)

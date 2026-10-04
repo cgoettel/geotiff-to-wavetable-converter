@@ -152,8 +152,8 @@ How point clouds are read:
   - `ground` (the default): the bare earth.
   - `blended`: every point averaged, so trees, brush, and buildings rise softly out of the ground.
   - `canopy`: the top of each spot, so treetops and rooftops. Buildings come out as sharp-edged blocks, which play as square waves.
-  - `clipped`: `canopy` with its tallest 10% cut flat, so a few big trees can't take the whole range. It caps elevation, so on a hill it flattens the hilltop too.
-  - `capped`: the ground's shape, with each tree or building's height above it limited to the 90th percentile of those heights. It keeps hilltops and still reins in the tallest trees and towers. Where a roof or crown hides the ground, the ground beneath is interpolated from the ground around it.
+  - `clipped`: `canopy` with its tallest 10% cut flat, so a few big trees can't take the whole range. It caps elevation, so on a hill it flattens the hilltop too. `--clip-percentile` moves the cut: `75` flattens the top quarter, and `99` only shaves the very tallest.
+  - `capped`: the ground's shape, with each tree or building's height above it limited to the 90th percentile of those heights. It keeps hilltops and still reins in the tallest trees and towers. Where a roof or crown hides the ground, the ground beneath is interpolated from the ground around it. `--cap-percentile` moves the cap: lower holds everything closer to the ground, and `100` keeps every height.
 - **`--surface all` writes every surface at once,** each with a letter and name so they sort together: `river-a-ground.wt`, `river-b-blended.wt`, `river-c-canopy.wt`, `river-d-clipped.wt`, `river-e-capped.wt`. In Bitwig's Polymer, filter the wavetable browser on the name (`river`) and click through them. A surface that comes out flat is skipped with a warning.
 - **Which sounds best depends on the place:**
   - On the Lower Colorado river, trees up to 30 m tall stand over a riverbed that varies by only 3.5 m. `ground` sounds best there, and `clipped` is a close second.

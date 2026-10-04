@@ -708,7 +708,7 @@ def test_surface_option_is_refused_on_rasters(tmp_path: Path, monkeypatch: pytes
     with pytest.raises(SystemExit) as exc_info:
         run_cli(monkeypatch, tmp_path, str(source), "--surface", "canopy")
 
-    assert exc_info.value.code == "ERROR: --surface applies to LiDAR point clouds (.las, .laz), not rasters."
+    assert exc_info.value.code == RASTER_REFUSAL
 
 
 # --- Logging -----------------------------------------------------------------------------------
@@ -812,3 +812,90 @@ def test_fill_option_reaches_the_converter(tmp_path: Path, monkeypatch: pytest.M
         run_cli(monkeypatch, tmp_path, str(source), *extra)
 
     assert seen == [fill]
+
+
+RASTER_REFUSAL = (
+    "ERROR: --surface, --clip-percentile, and --cap-percentile apply to LiDAR point clouds (.las, .laz), not rasters."
+)
+
+
+@pytest.mark.parametrize("option", ["--clip-percentile", "--cap-percentile"])
+def test_percentile_options_are_refused_on_rasters(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, option: str
+) -> None:
+    source = write_geotiff(tmp_path / "terrain.tif", gradient(8, 16))
+
+    with pytest.raises(SystemExit) as exc_info:
+        run_cli(monkeypatch, tmp_path, str(source), option, "75")
+
+    assert exc_info.value.code == RASTER_REFUSAL
+
+
+CLIP_REFUSAL = "ERROR: --clip-percentile applies to --surface clipped (or all)."
+CAP_REFUSAL = "ERROR: --cap-percentile applies to --surface capped (or all)."
+
+
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        (("--clip-percentile", "75"), CLIP_REFUSAL),
+        (("--surface", "capped", "--clip-percentile", "75"), CLIP_REFUSAL),
+        (("--surface", "canopy", "--cap-percentile", "75"), CAP_REFUSAL),
+    ],
+)
+def test_percentile_options_need_their_surface(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, options: tuple[str, ...], message: str
+) -> None:
+    """A percentile for a surface that isn't being made would silently do nothing, so it's an error."""
+    source = write_forest(tmp_path / "forest.las")
+
+    with pytest.raises(SystemExit) as exc_info:
+        run_cli(monkeypatch, tmp_path, str(source), *options)
+
+    assert exc_info.value.code == message
+
+
+@pytest.mark.parametrize("value", ["0", "100.5", "-3", "ninety"])
+def test_percentile_options_reject_out_of_range_values(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], value: str
+) -> None:
+    """Values must be numbers above 0 and at most 100; argparse rejects the rest with its usage line."""
+    source = write_forest(tmp_path / "forest.las")
+
+    with pytest.raises(SystemExit) as exc_info:
+        run_cli(monkeypatch, tmp_path, str(source), "--surface", "clipped", "--clip-percentile", value)
+
+    assert exc_info.value.code == 2
+    assert "--clip-percentile" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("options", "surface", "expected"),
+    [
+        (("--surface", "clipped", "--clip-percentile", "60"), "clipped", (60.0, 90.0)),
+        (("--surface", "capped", "--cap-percentile", "100"), "capped", (90.0, 100.0)),
+        (("--surface", "clipped"), "clipped", (90.0, 90.0)),
+    ],
+)
+def test_percentile_options_reach_the_loader(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    options: tuple[str, ...],
+    surface: str,
+    expected: tuple[float, float],
+) -> None:
+    """The flags pass straight through to load_lidar_surface, defaulting to 90."""
+    source = write_forest(tmp_path / "forest.las")
+    calls: list[tuple[str, float, float]] = []
+
+    def capture(points: object, name: str, clip_percentile: float, cap_percentile: float) -> None:
+        """Stand in for the loader: record what it was asked for, then stop."""
+        calls.append((name, clip_percentile, cap_percentile))
+        sys.exit(0)
+
+    monkeypatch.setattr("geotiff_to_wavetable.cli.load_lidar_surface", capture)
+
+    with pytest.raises(SystemExit):
+        run_cli(monkeypatch, tmp_path, str(source), *options)
+
+    assert calls == [(surface, *expected)]
