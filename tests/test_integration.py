@@ -88,7 +88,7 @@ def read_wt(path: Path) -> Wavetable:
 def run_cli(monkeypatch: pytest.MonkeyPatch, cwd: Path, *argv: str) -> None:
     """Invoke `main()` in-process with the given arguments from `cwd`.
 
-    chdir keeps the CLI's `geotiff_to_wavetable.log` out of the repo root.
+    chdir makes relative paths (inputs, -o) resolve inside the test's directory.
     """
     monkeypatch.chdir(cwd)
     monkeypatch.setattr(sys, "argv", ["geotiff-to-wavetable", *argv])
@@ -709,3 +709,29 @@ def test_surface_option_is_refused_on_rasters(tmp_path: Path, monkeypatch: pytes
         run_cli(monkeypatch, tmp_path, str(source), "--surface", "canopy")
 
     assert exc_info.value.code == "ERROR: --surface applies to LiDAR point clouds (.las, .laz), not rasters."
+
+
+# --- Logging -----------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("options", "shows_info", "shows_debug"),
+    [((), False, False), (("--verbose",), True, False), (("--debug",), True, True)],
+)
+def test_logging_goes_to_stderr_not_a_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    options: tuple[str, ...],
+    shows_info: bool,
+    shows_debug: bool,
+) -> None:
+    """Progress shows on stderr only with --verbose or --debug, and no log file is ever left behind."""
+    source = write_geotiff(tmp_path / "terrain.tif", gradient(8, 16))
+
+    run_cli(monkeypatch, tmp_path, str(source), *options)
+
+    stderr = capsys.readouterr().err
+    assert ("INFO: Produced wavetable" in stderr) == shows_info
+    assert ("DEBUG: Resizing" in stderr) == shows_debug
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["terrain.tif", "terrain.wt"]

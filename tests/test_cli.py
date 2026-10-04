@@ -5,8 +5,6 @@ wires up (a --help invocation exits with code 0). End-to-end CLI behavior lives
 in test_integration.py.
 """
 
-from pathlib import Path
-
 import pytest
 
 
@@ -21,14 +19,11 @@ def test_cli_module_imports() -> None:
     assert hasattr(cli, "main")
 
 
-def test_cli_help_exits_zero(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cli_help_exits_zero(monkeypatch: pytest.MonkeyPatch) -> None:
     """`geotiff_to_wavetable --help` exits with code 0.
 
-    Proves argparse is wired correctly and the module-level logging setup
-    runs without error. chdir to tmp_path so the FileHandler's log file
-    doesn't land in the repo root.
+    Proves argparse is wired correctly.
     """
-    monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("sys.argv", ["geotiff_to_wavetable", "--help"])
 
     from geotiff_to_wavetable.cli import main

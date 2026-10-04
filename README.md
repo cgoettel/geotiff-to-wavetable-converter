@@ -108,6 +108,14 @@ geotiff-to-wavetable examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif
 
 This opens a plot showing your elevation data. It's a helpful first step to make sure Python can read your file and that it contains the terrain you expect. If it doesn't look right, make sure to check how many bands there are (`-i`) and then view the other bands.
 
+**See what it's doing:**
+
+```bash
+geotiff-to-wavetable examples/USGS_OPR_AZ_2021LowerColoradoTB_C23_LCR_000002.tif --verbose
+```
+
+By default the tool prints only warnings and errors. `--verbose` adds progress messages (what was read, how it was resized), and `--debug` adds detailed diagnostics. Everything goes to the terminal (stderr); nothing is written to a log file.
+
 ### Images and scans
 
 Anything GDAL can read works as input: JPEG, PNG, WebP, BMP, GIF, and TIFF, georeferenced or not. A portable scanner and a city full of posters is a sample library.
