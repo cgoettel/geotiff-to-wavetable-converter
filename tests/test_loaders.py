@@ -245,3 +245,28 @@ def test_load_from_lidar_without_matching_points_raises(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match=r"no points classified as \[2\]"):
         load_from_lidar(points)
+
+
+def test_load_from_lidar_highest_takes_the_top_point_per_cell(tmp_path: Path) -> None:
+    """cell_value="highest" keeps each cell's tallest point: with every point, that's the canopy, not the ground."""
+    medium_vegetation = 4
+    points = write_las(
+        tmp_path / "fixture.las",
+        x=[0.0, 0.0, 0.0, 1.5],
+        y=[0.0, 0.0, 0.0, 0.0],
+        z=[10.0, 12.0, 30.0, 20.0],
+        classification=[GROUND, GROUND, medium_vegetation, GROUND],
+    )
+
+    np.testing.assert_array_equal(load_from_lidar(points, cell_size=1.0, cell_value="highest"), [[12.0, 20.0]])
+    np.testing.assert_array_equal(
+        load_from_lidar(points, classes=None, cell_size=1.0, cell_value="highest"), [[30.0, 20.0]]
+    )
+
+
+def test_load_from_lidar_rejects_an_unknown_cell_value(tmp_path: Path) -> None:
+    """A typo in cell_value fails loudly instead of silently averaging."""
+    points = write_las(tmp_path / "fixture.las", x=[0.0], y=[0.0], z=[1.0], classification=[GROUND])
+
+    with pytest.raises(ValueError, match="Cell value must be one of mean, highest"):
+        load_from_lidar(points, cell_value="median")  # type: ignore[arg-type]

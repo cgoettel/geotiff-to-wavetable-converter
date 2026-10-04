@@ -655,3 +655,57 @@ def test_point_cloud_without_ground_exits_with_error(tmp_path: Path, monkeypatch
         run_cli(monkeypatch, tmp_path, str(source))
 
     assert exc_info.value.code == "ERROR: The point cloud has no points classified as [2]."
+
+
+def write_forest(path: Path) -> Path:
+    """A flat 40x40 ground lattice at 10 m with a 30 m treetop (class 5) over every ground point."""
+    lattice = np.arange(40, dtype=np.float64)
+    x, y = (axis.ravel() for axis in np.meshgrid(lattice, lattice))
+    points = laspy.LasData(laspy.LasHeader(point_format=6, version="1.4"))
+    points.header.scales = np.array([0.01, 0.01, 0.01])
+    points.x = np.concatenate([x, x])
+    points.y = np.concatenate([y, y])
+    points.z = np.concatenate([np.full(x.size, 10.0), np.full(x.size, 30.0)])
+    points.classification = np.concatenate([np.full(x.size, 2), np.full(x.size, 5)]).astype(np.uint8)
+    points.write(path)
+    return path
+
+
+@pytest.mark.parametrize(
+    ("options", "low", "high"),
+    [
+        ((), 10.0, 10.0),  # ground by default: the forest floor is flat
+        (("--surface", "ground"), 10.0, 10.0),
+        (("--surface", "blended"), 20.0, 20.0),  # each cell averages ground and canopy equally
+        (("--surface", "canopy"), 30.0, 30.0),  # every cell has a treetop
+    ],
+)
+def test_surface_option_chooses_which_elevations_are_played(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, options: tuple[str, ...], low: float, high: float
+) -> None:
+    """--surface ground, blended, and canopy hand the converter the floor, the average, and the treetops."""
+    source = write_forest(tmp_path / "forest.las")
+    seen: list[npt.NDArray[np.float64]] = []
+
+    def capture(array: npt.NDArray[np.float64], **_: object) -> None:
+        """Stand in for the converter: record the grid, then stop before writing anything."""
+        seen.append(array.copy())
+        sys.exit(0)
+
+    monkeypatch.setattr("geotiff_to_wavetable.cli.array_to_wavetable", capture)
+
+    with pytest.raises(SystemExit):
+        run_cli(monkeypatch, tmp_path, str(source), *options)
+
+    assert seen[0].min() == low
+    assert seen[0].max() == high
+
+
+def test_surface_option_is_refused_on_rasters(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """--surface means nothing for a GeoTIFF, so it's an error rather than silently ignored."""
+    source = write_geotiff(tmp_path / "terrain.tif", gradient(8, 16))
+
+    with pytest.raises(SystemExit) as exc_info:
+        run_cli(monkeypatch, tmp_path, str(source), "--surface", "canopy")
+
+    assert exc_info.value.code == "ERROR: --surface applies to LiDAR point clouds (.las, .laz), not rasters."

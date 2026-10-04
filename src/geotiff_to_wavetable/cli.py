@@ -21,7 +21,13 @@ from geotiff_to_wavetable.io_utils import (
     write_wav_file,
     write_wt_file,
 )
-from geotiff_to_wavetable.loaders import LIDAR_NODATA, load_from_geotiff, load_from_lidar
+from geotiff_to_wavetable.loaders import (
+    GROUND,
+    LIDAR_NODATA,
+    CellValue,
+    load_from_geotiff,
+    load_from_lidar,
+)
 from geotiff_to_wavetable.validators import is_band_in_band, validate_wave_size
 
 # Set up logger
@@ -74,6 +80,14 @@ def output_paths(input_file: str, output_file: str | None, formats: tuple[str, .
 POINT_CLOUD_SUFFIXES = (".las", ".laz")
 
 
+# --surface: which LiDAR points to keep (None keeps every class) and how each grid cell reduces them.
+SURFACES: dict[str, tuple[tuple[int, ...] | None, CellValue]] = {
+    "ground": ((GROUND,), "mean"),  # bare earth, like an elevation model
+    "blended": (None, "mean"),  # every point averaged: canopy blended with the ground beneath
+    "canopy": (None, "highest"),  # the top of every cell: treetops and rooftops
+}
+
+
 def is_point_cloud(input_file: str) -> bool:
     """True for LAS/LAZ LiDAR files, which load through laspy instead of rasterio."""
     return Path(input_file).suffix.lower() in POINT_CLOUD_SUFFIXES
@@ -88,6 +102,8 @@ def read_raster(args: argparse.Namespace) -> tuple[npt.NDArray[np.float64], floa
     if src.crs is None:
         logger.info(f"{args.input_file} has no georeferencing (a photo or scan?); treating it as a plain image.")
 
+    if args.surface is not None:
+        sys.exit("ERROR: --surface applies to LiDAR point clouds (.las, .laz), not rasters.")
     # -b, --band. If the provided band is out-of-band, print an error message and exit.
     if args.band is not None:
         is_band_in_band(src, args.band)
@@ -107,7 +123,7 @@ def read_raster(args: argparse.Namespace) -> tuple[npt.NDArray[np.float64], floa
 
 
 def read_point_cloud(args: argparse.Namespace) -> tuple[npt.NDArray[np.float64], float | None]:
-    """Read a LAS/LAZ point cloud, handle -i and -v, and return its ground points rasterized, with their nodata."""
+    """Read a LAS/LAZ point cloud, handle -i and -v, and return it rasterized, with its nodata value."""
     if args.band is not None:
         sys.exit("ERROR: -b/--band picks a raster band; point clouds have none.")
     points = laspy.read(args.input_file)
@@ -116,9 +132,12 @@ def read_point_cloud(args: argparse.Namespace) -> tuple[npt.NDArray[np.float64],
         display_point_cloud_info(points)
         sys.exit(0)
 
-    logger.info(f"Converting ground points from {args.input_file}...")
+    # --surface picks which points to keep and how each cell reduces them; the default is the bare ground.
+    surface = args.surface or "ground"
+    classes, cell_value = SURFACES[surface]
+    logger.info(f"Converting the {surface} surface from {args.input_file}...")
     try:
-        array = load_from_lidar(points)
+        array = load_from_lidar(points, classes=classes, cell_value=cell_value)
     except ValueError as error:
         sys.exit(f"ERROR: {error}")
     # -v, --visualize. Shows the rasterized grid, which is what the wavetable is made from.
@@ -228,6 +247,18 @@ def main() -> None:
         help=(
             "Displays a visualization of the provided raster in an external viewer."
             "This is a helpful first step to make check your. See also -b/--band and -i/--info."
+        ),
+    )
+
+    parser.add_argument(
+        "--surface",
+        choices=SURFACES,
+        default=None,
+        help=(
+            "LiDAR only: which surface to play. ground is the bare earth (trees and buildings removed). blended "
+            "averages every point, so trees and buildings rise softly out of the ground. canopy takes the top of each "
+            "spot: treetops and rooftops. Tall trees can take over the range and flatten the terrain under them, so "
+            "which sounds best depends on the place. Default: ground"
         ),
     )
 
