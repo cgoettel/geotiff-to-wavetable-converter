@@ -7,6 +7,11 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 ### Added
 
 - `--surface ground|blended|canopy` chooses which LiDAR surface to play (#30). `ground` (the default) is the bare earth, `blended` averages every point so trees and buildings rise softly out of it, and `canopy` takes the top of each spot. `load_from_lidar` gains a `cell_value` argument (`mean` or `highest`) to go with `classes`.
+- `--verbose` and `--debug` print progress and diagnostics to stderr.
+
+### Fixed
+
+- The command no longer writes `geotiff_to_wavetable.log` into whatever directory it runs from (#31). Warnings and errors still print to the terminal, and `--verbose`/`--debug` show the rest.
 
 ## [0.4.0] - 2026-10-03
 

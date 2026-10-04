@@ -147,25 +147,25 @@ def read_point_cloud(args: argparse.Namespace) -> tuple[npt.NDArray[np.float64],
     return array, LIDAR_NODATA
 
 
+def configure_logging(verbose: bool, debug: bool) -> None:
+    """Send log messages to stderr: warnings and errors by default, more with --verbose or --debug.
+
+    Nothing is written to a file, so running the tool leaves nothing behind but its output.
+    """
+    level = logging.DEBUG if debug else logging.INFO if verbose else logging.WARNING
+    console_handler = logging.StreamHandler()  # Defaults to stderr
+    console_handler.setLevel(level)
+    console_handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+    # Attach to the package's logger rather than the root, so other libraries' logging is left alone. The logger
+    # passes everything through and the handler's level decides what's shown. Assigning (not appending) replaces the
+    # handler from an earlier call, as when tests run main() repeatedly.
+    package_logger = logging.getLogger("geotiff_to_wavetable")
+    package_logger.setLevel(logging.DEBUG)
+    package_logger.handlers = [console_handler]
+
+
 def main() -> None:
     """Parses the command-line arguments and runs the desired commands."""
-    # Set up logging.
-    #  We want INFO+ (default; feel free to change) logged to a file, but only WARNING+ to the console.
-    # File handler for everything
-    file_handler = logging.FileHandler("geotiff_to_wavetable.log")
-    file_handler.setLevel(logging.INFO)
-
-    # Console handler for warnings and errors only
-    console_handler = logging.StreamHandler()  # Defaults to stderr
-    console_handler.setLevel(logging.WARNING)
-    console_handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))  # Simplified format for console
-
-    logging.basicConfig(
-        level=logging.DEBUG,
-        handlers=[file_handler, console_handler],
-        format="%(asctime)s %(name)s - %(levelname)s: %(message)s",
-    )
-
     # Instantiate argument parser
     parser = argparse.ArgumentParser(description="Converts rasters and LiDAR point clouds to a wavetable.")
 
@@ -262,8 +262,20 @@ def main() -> None:
         ),
     )
 
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Also print progress messages (what was read, how it was gridded or resized) to stderr.",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Print everything --verbose does, plus detailed diagnostics (value ranges, nodata counts) to stderr.",
+    )
+
     # Parse arguments
     args: argparse.Namespace = parser.parse_args()
+    configure_logging(args.verbose, args.debug)
 
     # Read the input once, handling the options that stop before converting (-i, -v). argparse handles -h on its own.
     if is_point_cloud(args.input_file):
