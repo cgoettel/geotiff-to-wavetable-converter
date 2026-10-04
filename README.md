@@ -8,6 +8,22 @@ I've never worked with GeoTIFF and my wavetable experience is limited. Huge shou
 
 If you'd like to help or if you've noticed some issues, please see the [CONTRIBUTING guide](CONTRIBUTING.md) for information about how to go forward.
 
+## Installation
+
+The tool is on [PyPI](https://pypi.org/project/geotiff-to-wavetable/) and needs Python 3.10 or newer. Install it as a standalone command with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv tool install geotiff-to-wavetable
+```
+
+Or with [pipx](https://pipx.pypa.io/): `pipx install geotiff-to-wavetable`. Either one puts `geotiff-to-wavetable` on your path in its own environment, so its dependencies don't touch anything else. Check that it worked with `geotiff-to-wavetable -h`.
+
+To upgrade later, run `uv tool upgrade geotiff-to-wavetable`. To try changes that haven't been released yet, install straight from the repository:
+
+```bash
+uv tool install --force git+https://gitlab.com/colby.goettel/geotiff-to-wavetable-converter
+```
+
 ## Usage
 
 For these examples, we'll use the GeoTIFF of the lower Colorado River that ships in `examples/`. For more geospatial data, check out [the sources below](#finding-geospatial-data).
