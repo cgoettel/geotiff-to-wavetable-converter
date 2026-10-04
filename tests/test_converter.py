@@ -203,3 +203,32 @@ def test_array_to_wavetable_rejects_invalid_wave_size(wave_size: int) -> None:
     array = np.random.default_rng(0).random((8, 300))
     with pytest.raises(ValueError, match="power of 2"):
         array_to_wavetable(array, wave_size=wave_size)
+
+
+def test_clean_nodata_interpolate_follows_a_slope() -> None:
+    """On a ramp, an interpolated gap lands between its neighbors; the mean would drop it to the ramp's middle."""
+    ramp = np.tile(np.arange(0.0, 100.0, 10.0), (3, 1))  # 0, 10, ..., 90 left to right
+    gapped = ramp.copy()
+    gapped[1, 8] = -9999.0  # a gap where the ramp is 80
+
+    cleaned, valid_pct = _clean_nodata(gapped, nodata_value=-9999.0, fill="interpolate")
+
+    assert 70.0 < cleaned[1, 8] < 90.0
+    np.testing.assert_array_equal(np.delete(cleaned.ravel(), 18), np.delete(ramp.ravel(), 18))  # valid cells kept
+    assert valid_pct == pytest.approx(100 * 29 / 30)
+
+
+def test_clean_nodata_interpolate_fills_nan_and_wide_gaps() -> None:
+    """NaN gaps fill too, however far the nearest valid cell is (here, the far corner of the grid)."""
+    bands = np.full((20, 20), np.nan)
+    bands[0, 0] = 5.0
+
+    cleaned, _ = _clean_nodata(bands, nodata_value=np.nan, fill="interpolate")
+
+    np.testing.assert_array_equal(cleaned, np.full((20, 20), 5.0))
+
+
+def test_clean_nodata_rejects_an_unknown_fill() -> None:
+    bands = np.array([[1.0, -9999.0]])
+    with pytest.raises(ValueError, match="Fill must be one of mean, interpolate"):
+        _clean_nodata(bands, nodata_value=-9999.0, fill="nearest")  # type: ignore[arg-type]

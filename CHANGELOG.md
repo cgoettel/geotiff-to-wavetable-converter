@@ -2,6 +2,12 @@
 
 All notable changes to this project. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- `--fill mean|interpolate` chooses how gaps are filled: nodata in a raster, or LiDAR cells no point landed in (#33). `mean` (the default) uses the average of the valid data, which leaves a spike or a pit in every gap on a slope. `interpolate` estimates each gap from the cells around it, so it follows the terrain. `array_to_wavetable` takes a matching `fill` argument, and `interpolate_gaps` is exported.
+
 ## [0.6.0] - 2026-10-04
 
 ### Added

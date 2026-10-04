@@ -6,6 +6,7 @@ from geotiff_to_wavetable.converter import (
     array_to_wavetable,
     calculate_height,
     calculate_width,
+    interpolate_gaps,
 )
 from geotiff_to_wavetable.io_utils import (
     display_info,
@@ -32,6 +33,7 @@ __all__ = [
     "LIDAR_NODATA",
     "SURFACES",
     "array_to_wavetable",
+    "interpolate_gaps",
     "calculate_height",
     "calculate_width",
     "display_info",
