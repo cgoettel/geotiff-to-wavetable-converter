@@ -221,3 +221,9 @@ Where to get elevation data, in the order to try them:
 4. You might need to scroll up. Click the "🔍 Search Products" button. This will bring you to the Products tab.
 5. You can now scroll through the available images. If nothing returns, try increasing your area. For example, I couldn't find anything for Kauai. I zoomed out and couldn't find anything for the Hawaiian Islands. So I zoomed out and got stuff for the Aleutian Islands ([copyright is commercial for Alaska](https://www.usgs.gov/faqs/are-usgs-topographic-maps-copyrighted) which is why we're using Arizona for our `examples/`).
 6. Find something that looks interesting and click the "Download Link (TIF)" link (it might be "Download Link (ZIP)" and then you'll need to unzip and might have multiple TIFs to play around with).
+
+## Roadmap
+
+Open items:
+
+- [Staff-engineer handover](https://gitlab.com/colby.goettel/geotiff-to-wavetable-converter/-/work_items/35) (#35): a one-session exercise where an agent plays a staff engineer inheriting the repository. It interviews the owner for knowledge transfer, folds the answers into the docs, then proposes what it would do differently, discussed before anything is filed.
