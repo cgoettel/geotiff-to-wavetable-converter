@@ -227,3 +227,4 @@ Where to get elevation data, in the order to try them:
 Open items:
 
 - [Staff-engineer handover](https://gitlab.com/colby.goettel/geotiff-to-wavetable-converter/-/work_items/35) (#35): a one-session exercise where an agent plays a staff engineer inheriting the repository. It interviews the owner for knowledge transfer, folds the answers into the docs, then proposes what it would do differently, discussed before anything is filed.
+- [README badges](https://gitlab.com/colby.goettel/geotiff-to-wavetable-converter/-/work_items/36) (#36): pipeline, PyPI version, and MIT license badges at the top of this README.
