@@ -2,6 +2,12 @@
 
 All notable changes to this project. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- Python 3.15 is now the version the project is developed, type-checked, and tested on, in CI too (#37). It's still installable on Python 3.10 and newer.
+
 ## [0.8.0] - 2026-10-04
 
 ### Added

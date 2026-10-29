@@ -29,6 +29,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Topic :: Multimedia :: Sound/Audio",
     "Topic :: Scientific/Engineering :: GIS",
 ]
@@ -51,7 +52,7 @@ test = ["mypy>=1.19.1", "pre_commit>=4.5.1", "pytest>=8.3.2", "ruff>=0.14.10"]
 geotiff-to-wavetable = "geotiff_to_wavetable.cli:main"
 
 [tool.mypy]
-python_version = "3.14"
+python_version = "3.15"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
