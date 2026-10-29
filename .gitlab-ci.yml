@@ -27,9 +27,8 @@ default:
     - self-hosted
 
 .uv_python:
-  # Python 3.13, not 3.14: uv.lock pins numpy 2.2.6 (the last release supporting Python 3.10), which ships
-  # no 3.14 wheels, and this slim image has no compiler to build it from source.
-  image: ghcr.io/astral-sh/uv:0.13.5-python3.13-trixie-slim
+  # The project's primary Python. requires-python stays >=3.10; uv.lock resolves numpy per Python version.
+  image: ghcr.io/astral-sh/uv:0.13.5-python3.15-trixie-slim
   # Retry infrastructure failures (a ghcr.io image pull that hits a rate limit, say), never a failing script:
   # GitLab reports a failed test as script_failure, which this doesn't match.
   retry:
@@ -39,6 +38,9 @@ default:
     # rasterio's wheel links against the system libexpat, which the slim image lacks. (OpenCV needs nothing: the
     # headless build bundles its libraries, unlike opencv-python, which needed libgl1 and libglib2.0-0 here.)
     - apt-get update -qq && apt-get install -y -qq --no-install-recommends libexpat1 > /dev/null
+    # lazrs (laspy's LAZ backend) ships no Python 3.15 wheel yet, so uv builds it from source, which needs Rust and a
+    # C linker. The built wheel lands in the uv cache. Drop this once https://pypi.org/project/lazrs/ has cp315 wheels.
+    - apt-get install -y -qq --no-install-recommends cargo gcc libc6-dev > /dev/null
 
 test:
   extends: .uv_python
