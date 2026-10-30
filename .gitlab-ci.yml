@@ -8,6 +8,7 @@
 # GitLab's short-lived identity token for a short-lived PyPI upload token.
 #
 # test: every merge request and every push to main runs the tests and the pre-commit hooks (ruff, mypy).
+# test_oldest_python runs the tests again on the oldest supported Python.
 #
 # Every job runs on this repo's own in-cluster runner (smart-home kubernetes/geotiff-to-wavetable-converter-runner,
 # Kubernetes executor on deskf02). Shared GitLab-hosted runners are disabled on the project.
@@ -63,6 +64,28 @@ test:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+
+# The tests again on the oldest Python in requires-python, since `test` and mypy only see 3.15. Bump the image and
+# UV_PYTHON together with requires-python. Tests only: the hooks don't depend on the Python version.
+test_oldest_python:
+  extends: test
+  image: ghcr.io/astral-sh/uv:0.13.5-python3.11-trixie-slim
+  variables:
+    # Fail rather than quietly download a newer Python.
+    UV_PYTHON: "3.11"
+    UV_PYTHON_DOWNLOADS: never
+  cache:
+    # Its own cache, so it doesn't replace the 3.15 one that holds the lazrs wheel built from source.
+    key:
+      prefix: python3.11
+      files: [uv.lock]
+    paths: [.cache/uv]
+  before_script:
+    # lazrs has 3.11 wheels, so this needs only libexpat, not the Rust toolchain.
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends libexpat1 > /dev/null
+  script:
+    - uv run --extra test python --version
+    - uv run --extra test pytest -q
 
 mirror_to_github:
   image:

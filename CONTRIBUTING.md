@@ -108,6 +108,8 @@ uv run pre-commit run --all-files
 
 Every merge request and every push to `main` runs the `test` job in GitLab CI: the tests, then the same pre-commit hooks with `--all-files`. It runs the hooks rather than the ruff and mypy versions in `uv.lock`, so CI checks exactly what a local commit does. If the hooks pass locally, the job should too.
 
+`test` runs on Python 3.15, the version the project is developed on. A second job, `test_oldest_python`, runs the tests on the oldest version `requires-python` allows (3.11), so code that needs a newer Python fails there before it reaches users. When you raise `requires-python`, bump that job's image and `UV_PYTHON` along with ruff's `target-version`.
+
 ## Building and uploading to PyPi
 
 ### Building the package
