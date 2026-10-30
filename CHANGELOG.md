@@ -6,7 +6,11 @@ All notable changes to this project. The format follows [Keep a Changelog](https
 
 ### Changed
 
-- Python 3.15 is now the version the project is developed, type-checked, and tested on, in CI too (#37). It's still installable on Python 3.10 and newer.
+- Python 3.15 is now the version the project is developed, type-checked, and tested on, in CI too (#37).
+
+### Removed
+
+- Python 3.10 support (#39). It reached end of life on October 1, 2026, so the package now needs Python 3.11 or newer.
 
 ## [0.8.0] - 2026-10-04
 

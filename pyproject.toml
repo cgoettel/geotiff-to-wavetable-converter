@@ -7,7 +7,7 @@ name = "geotiff-to-wavetable"
 version = "0.8.0"
 description = "Convert GeoTIFF elevation data to wavetable files for synthesizers"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Colby Goettel", email = "colby.goettel@gmail.com" }]
@@ -24,7 +24,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "Intended Audience :: End Users/Desktop",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -65,7 +64,7 @@ ignore_missing_imports = true
 [tool.ruff]
 line-length = 120
 # The oldest Python the package supports (requires-python), so ruff never suggests syntax a supported version lacks.
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.format]
 quote-style = "double"
