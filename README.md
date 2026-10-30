@@ -10,7 +10,7 @@ If you'd like to help or if you've noticed some issues, please see the [CONTRIBU
 
 ## Installation
 
-The tool is on [PyPI](https://pypi.org/project/geotiff-to-wavetable/) and needs Python 3.10 or newer. Install it as a standalone command with [uv](https://docs.astral.sh/uv/):
+The tool is on [PyPI](https://pypi.org/project/geotiff-to-wavetable/) and needs Python 3.11 or newer. Install it as a standalone command with [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv tool install geotiff-to-wavetable
