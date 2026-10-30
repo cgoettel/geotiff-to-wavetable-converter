@@ -64,7 +64,8 @@ ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 120
-target-version = "py313"
+# The oldest Python the package supports (requires-python), so ruff never suggests syntax a supported version lacks.
+target-version = "py310"
 
 [tool.ruff.format]
 quote-style = "double"
