@@ -2,6 +2,12 @@
 
 All notable changes to this project. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- `examples/lower-colorado.wt` is regenerated with interpolated gap-filling, the default since 0.7.0, so the release check in `docs/manual-validation.md` passes again (#41).
+
 ## [0.9.0] - 2026-10-29
 
 ### Changed
